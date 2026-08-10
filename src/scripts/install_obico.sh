@@ -19,6 +19,35 @@
 
 set -e
 
+function fix_janus_live_streaming()
+{
+    # Without this, Obico's dashboard falls back to periodic snapshot
+    # polling instead of a real live video feed ("Real-time stream
+    # unavailable, showing last captured image").
+    #
+    # moonraker-obico bundles precompiled Janus (the WebRTC server it
+    # needs for live streaming) binaries under moonraker_obico/bin/
+    # janus/precomplied/<board>.<os>.<version>.<bits>/, but only
+    # recognizes "rpi" (Raspberry Pi) or "mks" (Makerbase) boards via
+    # /sys/firmware/devicetree/base/model (see board_id() in
+    # moonraker_obico/utils.py). The Sonic Pad's Allwinner board (model
+    # string "sun50iw10") matches neither, so board_id() returns "NA",
+    # no precompiled directory ever matches, and Janus never starts -
+    # even though the bundled rpi.debian.12.64-bit binaries are just
+    # plain aarch64 Debian 12 ELF binaries with no real Pi-specific
+    # dependency, and run fine here. Symlinking the variant Sonic Pad
+    # actually resolves to onto the closest real match fixes detection
+    # without needing to touch moonraker-obico's own source.
+    #
+    # Separately, that Janus binary is also missing several shared
+    # library dependencies that aren't part of this project's normal
+    # package list (confirmed via ldd): libconfig9, libnice10,
+    # libsrtp2-1, libusrsctp2. All ordinary Debian bookworm packages.
+    local janus_precompiled_dir="${HOME}/moonraker-obico/moonraker_obico/bin/janus/precomplied"
+    ln -sf rpi.debian.12.64-bit "${janus_precompiled_dir}/NA.debian.12.64-bit"
+    sudo apt-get install --yes libconfig9 libnice10 libsrtp2-1 libusrsctp2
+}
+
 function install_obico()
 {
     local obico_dir="${HOME}/moonraker-obico"
@@ -33,4 +62,6 @@ function install_obico()
         -C "${HOME}/printer_data/config/moonraker.conf" \
         -l "${HOME}/printer_data/logs" \
         -S "https://app.obico.io"
+
+    fix_janus_live_streaming
 }
