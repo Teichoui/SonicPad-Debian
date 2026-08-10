@@ -36,10 +36,10 @@ if [ -d "$ROOTFS_DIR" ]
 then
 	if [ "$(ls -A $ROOTFS_DIR)" ]; then
         echo "The dir: $ROOTFS_DIR is not empty, this script will delete it."
-        read -p "Do you want to proceed? (Y/n) " yn
+        read -p "Do you want to proceed? (y/n) " yn
         case $yn in
-            Y ) echo ok, we will proceed;;
-            n ) echo exiting...;
+            [yY] ) echo ok, we will proceed;;
+            [nN] ) echo exiting...;
                 exit;;
             * ) echo invalid response;
                 exit 1;;
