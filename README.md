@@ -160,3 +160,48 @@ cat /tmp/regfix.txt > /proc/sys/fs/binfmt_misc/register
 ```
 
 `update-binfmts --disable qemu-aarch64 && update-binfmts --enable qemu-aarch64` does **not** reliably fix this even though its config file claims credentials support — the manual re-registration above is required. If your rootfs was already built under a broken registration, delete `src/rootfs`, `src/out`, and `src/temp` and rebuild from scratch after fixing this.
+
+### 3. Runtime: Moonraker's Update Manager shows everything as "Invalid" / websocket randomly drops with "broken pipe"
+
+This isn't a build bug, but a real bug in the device's own kernel that anyone running this image will hit. The Sonic Pad's kernel reports `clock_getres(CLOCK_MONOTONIC)` as **~547 seconds** instead of nanosecond/microsecond scale:
+
+```bash
+python3 -c "import time; print(time.get_clock_info('monotonic'))"
+# resolution=547.554232048   <- should be a tiny fraction of a second
+```
+
+Python's `asyncio` reads this once at event loop creation and uses it to decide which scheduled timers are due (`base_events.py`: `end_time = self.time() + self._clock_resolution`). With a 547-second resolution, *any* timer due within the next ~9 minutes — `asyncio.wait_for()` timeouts, Tornado's websocket ping/pong deadlines, etc. — is treated as already expired and fires instantly instead of at its real deadline. Reproduced standalone with zero application code:
+
+```python
+import asyncio, time
+async def m():
+    loop = asyncio.get_running_loop()
+    fired = []
+    loop.call_later(20, lambda: fired.append("fired early!"))
+    asyncio.ensure_future(asyncio.sleep(0.05))  # creating any concurrent Task triggers it
+    await asyncio.sleep(4)
+    print(fired)  # prints ['fired early!'] after ~1ms, not empty after 4s
+asyncio.run(m())
+```
+
+This is the true root cause behind the `tornado==6.4.2` pin in `install_moonraker.sh` (the pin is a coincidental workaround, not a real fix) and behind Moonraker's Update Manager showing Klipper/Moonraker/KlipperScreen as permanently "Invalid" with `"No git repo detected at configured path"` — the `git status` subprocess calls used to check repo state were "timing out" in under a millisecond every single time.
+
+The real fix (already baked into `install_moonraker.sh` via `install_clock_resolution_fix`) overrides the resolution Python reports for the monotonic clock, injected as a `PYTHONPATH` sitecustomize.py outside Moonraker's own git tree so it survives future `git pull` updates. If you're on an image built before this fix landed, you can apply it manually:
+
+```bash
+mkdir -p ~/printer_data/pyfix
+cat > ~/printer_data/pyfix/sitecustomize.py <<'EOF'
+import time
+_orig_get_clock_info = time.get_clock_info
+def _get_clock_info(name):
+    info = _orig_get_clock_info(name)
+    if name == "monotonic" and info.resolution > 0.001:
+        import types
+        info = types.SimpleNamespace(implementation=info.implementation,
+            monotonic=info.monotonic, adjustable=info.adjustable, resolution=1e-6)
+    return info
+time.get_clock_info = _get_clock_info
+EOF
+echo 'PYTHONPATH=/home/'"$USER"'/printer_data/pyfix' | sudo tee -a ~/printer_data/systemd/moonraker.env
+sudo systemctl restart moonraker
+```
