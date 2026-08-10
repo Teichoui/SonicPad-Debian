@@ -1,0 +1,13 @@
+diff --git a/README.md b/README.md
+index 3612b66..44ab935 100644
+--- a/README.md
++++ b/README.md
+@@ -17,7 +17,7 @@
+ 
+ ## 🚀 Features
+ 
+-Ready to go Debian 11 Bullseye Image for the SonicPad! Allows you to install the latest, unmodified, versions of software within the Klipper ecosystem.
++Ready to go Debian 12 Bookworm Image for the SonicPad! Allows you to install the latest, unmodified, versions of software within the Klipper ecosystem.
+ 
+ The following packages are pre-installed:
+ 

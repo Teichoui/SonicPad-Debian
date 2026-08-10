@@ -17,7 +17,7 @@
 
 ## 🚀 Features
 
-Ready to go Debian 11 Bullseye Image for the SonicPad! Allows you to install the latest, unmodified, versions of software within the Klipper ecosystem.
+Ready to go Debian 12 Bookworm Image for the SonicPad! Allows you to install the latest, unmodified, versions of software within the Klipper ecosystem.
 
 The following packages are pre-installed:
 
