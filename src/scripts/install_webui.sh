@@ -124,23 +124,30 @@ function install_mainsail()
     patch_webui_update_manager "mainsail" "mainsail-crew/mainsail" "${webroot}"
 }
 
-function register_fluidd_installable()
+function install_fluidd()
 {
-    # Fluidd itself is NOT downloaded at build time - only its nginx
-    # site (port 4408, alongside Mainsail on 80) and its
-    # [update_manager fluidd] entry in moonraker.conf are set up. With
-    # an empty webroot, Moonraker's NetDeploy reports it as not
-    # installed (is_valid: false), which the Update Manager panel in
-    # Mainsail/Fluidd/KlipperScreen surfaces as an install prompt -
-    # NetDeploy's update path creates the directory and downloads the
-    # release the same way a real update would. This gives every user
-    # a one-click way to install Fluidd from the UI on their own,
-    # rather than deciding for them (or asking) at image-build time,
-    # long before anyone is looking at the printer.
+    # NOTE: registering an [update_manager fluidd] entry with an empty
+    # webroot, hoping users could "install" it later with one click
+    # from the Update Manager panel, does NOT work - verified by
+    # reading Moonraker's own source. NetDeploy.update() (which handles
+    # type: web entries) unconditionally raises "Invalid install
+    # detected, aborting update" if self._is_valid is False, and
+    # recover() just calls straight into update() with the same guard.
+    # There is no Moonraker action that bootstraps a fresh install of a
+    # web client; it can only update one that's already there. So
+    # Fluidd has to actually be downloaded here, at install time, same
+    # as Mainsail.
+    echo "Installing Fluidd..."
     local webroot="${HOME}/fluidd"
     mkdir -p "${webroot}"
+    wget -q -O "${webroot}/fluidd.zip" https://github.com/fluidd-core/fluidd/releases/latest/download/fluidd.zip
+    unzip -oq "${webroot}/fluidd.zip" -d "${webroot}"
+    rm "${webroot}/fluidd.zip"
+
+    # Fluidd is opt-in, so it doesn't compete with Mainsail for port 80.
     write_webui_nginx_site "fluidd" "${webroot}" 4408 "no"
     patch_webui_update_manager "fluidd" "fluidd-core/fluidd" "${webroot}"
+    echo "Fluidd installed - reachable on port 4408 (e.g. http://<sonic-pad-ip>:4408)"
 }
 
 function install_webui()
@@ -150,10 +157,17 @@ function install_webui()
     # 1) Mainsail is always installed, as the default UI on port 80.
     install_mainsail
 
-    # 2) Fluidd is registered as an installable option in the Update
-    #    Manager UI, not downloaded outright - see
-    #    register_fluidd_installable() above for why.
-    register_fluidd_installable
+    # 2) Fluidd is optional - ask, rather than installing two full UIs
+    #    unconditionally on every build.
+    read -rp "Also install Fluidd (alternate web UI, served on port 4408)? [y/N] " reply
+    case "${reply}" in
+        [yY]|[yY][eE][sS])
+            install_fluidd
+            ;;
+        *)
+            echo "Skipping Fluidd."
+            ;;
+    esac
 
     sudo nginx -t
     sudo systemctl enable nginx
