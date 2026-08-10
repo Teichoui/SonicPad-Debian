@@ -28,6 +28,17 @@ function create_moonraker_env()
     if virtualenv -p "python3" "${MOONRAKER_ENV}"; then
         "${MOONRAKER_ENV}"/bin/pip install -U pip
         "${MOONRAKER_ENV}"/bin/pip install -r "${MOONRAKER_DIR}/scripts/moonraker-requirements.txt"
+        # Tornado 6.5.x (the whole 6.5 line, not just 6.5.1+) has a real
+        # incompatibility with Moonraker's websocket_ping_interval=10s
+        # setting (moonraker/components/application.py): connections open,
+        # get one message, then close almost instantly with "ping timed
+        # out" - even with client-side pinging fully disabled, proving the
+        # failure originates server-side in Tornado's own ping/pong
+        # handling. Reproduced with a bare websocket-client script with
+        # zero KlipperScreen code involved. Pinning to 6.4.2 (last known
+        # stable line before this regression) fixes it completely -
+        # verified stable over repeated real-world testing.
+        "${MOONRAKER_ENV}"/bin/pip install "tornado==6.4.2"
     else
         echo "Error creating venv for moonraker"
     fi
