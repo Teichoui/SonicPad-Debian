@@ -184,7 +184,7 @@ async def m():
 asyncio.run(m())
 ```
 
-This is the true root cause behind the `tornado==6.4.2` pin in `install_moonraker.sh` (the pin is a coincidental workaround, not a real fix) and behind Moonraker's Update Manager showing Klipper/Moonraker/KlipperScreen as permanently "Invalid" with `"No git repo detected at configured path"` — the `git status` subprocess calls used to check repo state were "timing out" in under a millisecond every single time.
+This was the true root cause behind websocket connections dying almost instantly with "ping timed out" (an earlier build of this fork worked around it by pinning `tornado==6.4.2`, since older tornado happened to hit the buggy timer window less often — that pin has since been removed now that the real bug is fixed) and behind Moonraker's Update Manager showing Klipper/Moonraker/KlipperScreen as permanently "Invalid" with `"No git repo detected at configured path"` — the `git status` subprocess calls used to check repo state were "timing out" in under a millisecond every single time.
 
 The real fix (already baked into `install_moonraker.sh` via `install_clock_resolution_fix`) overrides the resolution Python reports for the monotonic clock, injected as a `PYTHONPATH` sitecustomize.py outside Moonraker's own git tree so it survives future `git pull` updates. If you're on an image built before this fix landed, you can apply it manually:
 
