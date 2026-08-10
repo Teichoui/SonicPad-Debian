@@ -124,3 +124,39 @@ I'm not responsible for bricked devices, failed prints, etc. This is merely a pl
 
 
 
+
+## 🛠️ Building main (arm64 / Bookworm) on WSL2 / Ubuntu 22.04
+
+The `main` branch now targets **Debian 12 Bookworm, arm64 (64-bit)** instead of the old bullseye/armhf release. If you're building it yourself via [DIY.md](DIY.md) on WSL2/Ubuntu 22.04, you'll likely hit two real bugs — both fixed by doing the following **before** running `./build.sh`:
+
+### 1. `dragon` fails with "No such file or directory" (it's actually there)
+
+`prebuilt_kernel/tools/dragon` is a **32-bit x86** ELF binary. Ubuntu 22.04 x86_64 doesn't have 32-bit library support enabled by default, so the 32-bit dynamic linker it needs doesn't exist — the kernel reports this as "No such file or directory" even though the file is present. Fix:
+
+```bash
+dpkg --add-architecture i386
+apt-get update
+apt-get install -y libc6:i386 libstdc++6:i386 zlib1g:i386
+```
+
+### 2. Build silently produces a broken/undersized image (or fails with `Illegal option --` / `cannot open <command>`)
+
+This is caused by `qemu-user-static`'s default binfmt_misc registration missing flags the second-stage chroot install needs. Symptoms vary depending on exactly what's missing:
+- **Missing Credentials (`C`) flag**: privileged operations inside the chroot (like `sudo`) silently fail, producing a rootfs that looks complete but is missing large chunks (Klipper/Moonraker/KlipperScreen never get installed, final image ends up far smaller than it should be).
+- **Missing Preserve-argv0 (`P`) flag**: argument passing to emulated binaries breaks entirely — e.g. `sh -c 'command'` gets misinterpreted as `sh <file named "command">`, producing errors like `-c: 0: cannot open <command>: No such file` or `Illegal option --`.
+
+Check the current registration:
+
+```bash
+cat /proc/sys/fs/binfmt_misc/qemu-aarch64
+```
+
+If `flags:` isn't at least `PCF`, re-register it:
+
+```bash
+printf ':qemu-aarch64:M::\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/libexec/qemu-binfmt/aarch64-binfmt-P:PCF\n' > /tmp/regfix.txt
+echo -1 > /proc/sys/fs/binfmt_misc/qemu-aarch64 2>/dev/null
+cat /tmp/regfix.txt > /proc/sys/fs/binfmt_misc/register
+```
+
+`update-binfmts --disable qemu-aarch64 && update-binfmts --enable qemu-aarch64` does **not** reliably fix this even though its config file claims credentials support — the manual re-registration above is required. If your rootfs was already built under a broken registration, delete `src/rootfs`, `src/out`, and `src/temp` and rebuild from scratch after fixing this.
