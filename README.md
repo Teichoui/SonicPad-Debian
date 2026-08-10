@@ -205,3 +205,16 @@ EOF
 echo 'PYTHONPATH=/home/'"$USER"'/printer_data/pyfix' | sudo tee -a ~/printer_data/systemd/moonraker.env
 sudo systemctl restart moonraker
 ```
+
+### 4. Linking Obico after install
+
+`moonraker-obico` is installed automatically (pointed at the Obico Cloud, `https://app.obico.io`, by default) but is **not** linked to any account - linking associates one specific printer with one specific person's account, so it can't be done at image-build time. To link:
+
+```bash
+cd ~/moonraker-obico
+./scripts/link.sh -c ~/printer_data/config/moonraker-obico.cfg
+```
+
+This prints a manual linking code and scans the local network so the Obico app/website can discover the printer automatically instead.
+
+To use a self-hosted Obico server instead of the cloud, edit the `url` under `[server]` in `~/printer_data/config/moonraker-obico.cfg` before linking (or pass `-S http://<server-ip>:<port>` to `link.sh`).

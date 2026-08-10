@@ -14,6 +14,7 @@ source ./install_moonraker.sh
 source ./install_klipperscreen.sh
 source ./install_webui.sh
 source ./install_crowsnest.sh
+source ./install_obico.sh
 
 echo "Installing Klipper"
 install_klipper
@@ -29,6 +30,9 @@ install_webui
 
 echo "Installing crowsnest (webcam streamer)"
 install_crowsnest
+
+echo "Installing moonraker-obico (AI print failure detection)"
+install_obico
 
 echo "Enabling depmod service"
 sudo chmod +x /usr/local/bin/depmod_enable.sh
