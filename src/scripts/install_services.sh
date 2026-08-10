@@ -13,6 +13,7 @@ source ./install_klipper.sh
 source ./install_moonraker.sh
 source ./install_klipperscreen.sh
 source ./install_webui.sh
+source ./install_crowsnest.sh
 
 echo "Installing Klipper"
 install_klipper
@@ -25,6 +26,9 @@ install_klipperscreen
 
 echo "Installing web UI (Mainsail, optionally Fluidd)"
 install_webui
+
+echo "Installing crowsnest (webcam streamer)"
+install_crowsnest
 
 echo "Enabling depmod service"
 sudo chmod +x /usr/local/bin/depmod_enable.sh
