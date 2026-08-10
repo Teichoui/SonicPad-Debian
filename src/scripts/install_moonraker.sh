@@ -113,6 +113,54 @@ function install_moonraker_polkit() {
   "${HOME}"/moonraker/scripts/set-policykit-rules.sh --disable-systemctl
 }
 
+function install_clock_resolution_fix()
+{
+    # Workaround for a broken clock_getres(CLOCK_MONOTONIC) on this
+    # device's kernel: it reports a resolution of ~547 seconds instead of
+    # nanosecond/microsecond scale. asyncio.BaseEventLoop reads this once
+    # at loop creation (base_events.py: self._clock_resolution =
+    # time.get_clock_info('monotonic').resolution) and uses it in
+    # _run_once() as: end_time = self.time() + self._clock_resolution, to
+    # decide which scheduled timers are "due". With a 547s resolution, ANY
+    # timer due within the next ~9 minutes (asyncio.wait_for timeouts,
+    # Tornado's websocket ping/pong deadlines, etc.) is treated as already
+    # expired and fires instantly instead of at its real deadline.
+    # Reproduced standalone with zero application code: a call_later(20)
+    # timer fires in under 1ms once any other asyncio Task is created.
+    # This broke Moonraker's update_manager git checks outright (git
+    # status subprocess calls "timed out" in ~1ms every time) and was very
+    # likely the true root cause behind websocket "broken pipe"
+    # disconnects, for which pinning tornado==6.4.2 above is only a
+    # coincidental workaround.
+    #
+    # Deployed as a PYTHONPATH-injected sitecustomize.py (see
+    # moonraker.env) rather than editing moonraker's own source tree, so
+    # it survives `git pull` updates to Moonraker without dirtying its repo.
+    local pyfix_dir="${HOME}/printer_data/pyfix"
+    mkdir -p "${pyfix_dir}"
+    cat > "${pyfix_dir}/sitecustomize.py" <<'PYFIX_EOF'
+import time
+
+_orig_get_clock_info = time.get_clock_info
+
+
+def _get_clock_info(name):
+    info = _orig_get_clock_info(name)
+    if name == "monotonic" and info.resolution > 0.001:
+        import types
+        info = types.SimpleNamespace(
+            implementation=info.implementation,
+            monotonic=info.monotonic,
+            adjustable=info.adjustable,
+            resolution=1e-6,
+        )
+    return info
+
+
+time.get_clock_info = _get_clock_info
+PYFIX_EOF
+}
+
 function install_moonraker()
 {
     # 1) Clone Klipper repo
@@ -133,8 +181,11 @@ function install_moonraker()
     # 5) Install moonraker pollkit
     install_moonraker_polkit
 
-    # 6) Enable service
-    sudo systemctl enable moonraker 
+    # 6) Install monotonic clock resolution fix (see function for details)
+    install_clock_resolution_fix
+
+    # 7) Enable service
+    sudo systemctl enable moonraker
 
     sudo usermod -aG dialout $USER
 }
