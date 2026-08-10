@@ -198,6 +198,7 @@ polkit.addRule(function(action, subject) {
          action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
          action.id == "org.freedesktop.login1.halt" ||
          action.id == "org.freedesktop.login1.halt-multiple-sessions" ||
+         action.id == "org.freedesktop.timedate1.set-timezone" ||
          action.id.startsWith("org.freedesktop.NetworkManager.")) &&
         subject.user == "$USER") {
         // Only allow processes with the "klipperscreen" supplementary group
@@ -224,6 +225,7 @@ create_policy_legacy()
     ACTIONS="${ACTIONS};org.freedesktop.login1.reboot-multiple-sessions"
     ACTIONS="${ACTIONS};org.freedesktop.login1.halt"
     ACTIONS="${ACTIONS};org.freedesktop.login1.halt-multiple-sessions"
+    ACTIONS="${ACTIONS};org.freedesktop.timedate1.set-timezone"
     ACTIONS="${ACTIONS};org.freedesktop.NetworkManager.*"
     sudo /bin/sh -c "cat > ${RULE_FILE}" << EOF
 [KlipperScreen]
