@@ -58,6 +58,16 @@ function configure_xorg_fb()
     sudo cp $xorgconf /etc/X11/
 }
 
+function fix_touchscreen_permissions()
+{
+    # Without this, the touchscreen's input device (e.g. the Goodix
+    # gt9xx touch controller) is only readable by root/the 'input'
+    # group, so KlipperScreen runs but never receives any touch events
+    # - the screen renders fine but appears completely unresponsive.
+    echo "Adding $(whoami) to the input group so touch events are readable"
+    sudo usermod -aG input "$(whoami)"
+}
+
 function install_klipperscreen()
 {
     # 1) Install KlipperScreen
@@ -69,7 +79,10 @@ function install_klipperscreen()
     # 3) Configure display
     configure_xorg_fb
 
-    # 3) Fix permissions
+    # 4) Fix permissions
     sudo bash -c "echo needs_root_rights=yes>>/etc/X11/Xwrapper.config"
+
+    # 5) Fix touchscreen permissions
+    fix_touchscreen_permissions
 }
 
