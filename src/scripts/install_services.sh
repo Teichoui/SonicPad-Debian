@@ -12,6 +12,7 @@ sudo -- sh -c "echo '127.0.1.1 SonicPad' >> /etc/hosts"
 source ./install_klipper.sh
 source ./install_moonraker.sh
 source ./install_klipperscreen.sh
+source ./install_webui.sh
 
 echo "Installing Klipper"
 install_klipper
@@ -21,6 +22,9 @@ install_moonraker
 
 echo "Installing Klipperscreen"
 install_klipperscreen
+
+echo "Installing web UI (Mainsail, optionally Fluidd)"
+install_webui
 
 echo "Enabling depmod service"
 sudo chmod +x /usr/local/bin/depmod_enable.sh
