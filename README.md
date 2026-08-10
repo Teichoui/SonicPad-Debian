@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/Jpe230/SonicPad-Debian/" title="SonicPad Logo">
+  <a href="https://github.com/Teichoui/SonicPad-Debian/" title="SonicPad Logo">
     <img src="https://github.com/Jpe230/SonicPad-Debian/assets/6202305/ce559b28-9835-4447-809d-594a5bb70847" width="200px" alt="SonicPad Logo"/>
   </a>
 </p>
@@ -8,11 +8,11 @@
 
 <h2 align="center">🌐 Links 🌐</h2>
 <p align="center">
-    <a href="https://github.com/Jpe230/SonicPad-Debian/releases" title="Releases">📂 Releases</a>
+    <a href="https://github.com/Teichoui/SonicPad-Debian/releases" title="Releases">📂 Releases</a>
     ·
-    <a href="https://github.com/Jpe230/SonicPad-Debian/issues/new/choose" title="Report Bug/Request Feature">🐛 Got an issue</a>
+    <a href="https://github.com/Teichoui/SonicPad-Debian/issues/new/choose" title="Report Bug/Request Feature">🐛 Got an issue</a>
     .
-    <a href="https://github.com/Jpe230/SonicPad-Debian/pulls" title="PR">🚀 Contribute a new feature </a>
+    <a href="https://github.com/Teichoui/SonicPad-Debian/pulls" title="PR">🚀 Contribute a new feature </a>
 </p>
 
 ## 🚀 Features
@@ -32,7 +32,7 @@ The following packages are pre-installed:
 
 ## 🛠️ Installation Steps
 
-1. Download the latest [release image](https://github.com/Jpe230/SonicPad-Debian/releases)
+1. Download the latest [release image](https://github.com/Teichoui/SonicPad-Debian/releases)
 
 2. Flash the Sonic Pad
 
@@ -68,15 +68,15 @@ sudo brightness -h
 
 ## 📂 Directory Structure
 
-> [`src`](https://github.com/Jpe230/SonicPad-Debian/blob/main/src "src"): Scripts necessary to build a rootfs.
+> [`src`](https://github.com/Teichoui/SonicPad-Debian/blob/main/src "src"): Scripts necessary to build a rootfs.
 
-> [`src/prebuilt_kernel`](https://github.com/Jpe230/SonicPad-Debian/blob/main/src/prebuilt_kernel "src/prebuilt"): Prebuilt Kernel and tools necessary to pack the final image
+> [`src/prebuilt_kernel`](https://github.com/Teichoui/SonicPad-Debian/blob/main/src/prebuilt_kernel "src/prebuilt"): Prebuilt Kernel and tools necessary to pack the final image
 
-> [`src/base_rootfs`](https://github.com/Jpe230/SonicPad-Debian/blob/main/src/base_rootfs "src/base_rootfs"): Files that are needed to be copied to the built rootfs 
+> [`src/base_rootfs`](https://github.com/Teichoui/SonicPad-Debian/blob/main/src/base_rootfs "src/base_rootfs"): Files that are needed to be copied to the built rootfs 
 
-> [`src/scripts`](https://github.com/Jpe230/SonicPad-Debian/blob/main/src/scripts "src/scripts"): Scripts to install Klipper, Moonraker, KlipperScreen
+> [`src/scripts`](https://github.com/Teichoui/SonicPad-Debian/blob/main/src/scripts "src/scripts"): Scripts to install Klipper, Moonraker, KlipperScreen
 
-❗Want to build your own rootfs? Please see the [DIY Section](https://github.com/Jpe230/SonicPad-Debian/blob/main/DIY.md)
+❗Want to build your own rootfs? Please see the [DIY Section](https://github.com/Teichoui/SonicPad-Debian/blob/main/DIY.md)
 
 ## 🎊 Future Updates
 
