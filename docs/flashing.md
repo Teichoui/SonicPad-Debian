@@ -100,16 +100,20 @@ Once the drivers are installed, PhoenixSuit should pop up with a prompt. If it d
 
 ### Troubleshooting: PhoenixSuit still doesn't detect the device
 
-If the steps above don't get PhoenixSuit to recognize the SonicPad in burning mode - the driver install fails, Windows blocks it with an unverified-publisher warning, or PhoenixSuit just never pops up even after a restart - this is a known issue with the bundled Allwinner USB drivers on modern Windows (10/11 enforce driver signature requirements the old Allwinner driver package predates).
+If the steps above don't get PhoenixSuit to recognize the SonicPad in burning mode - Windows blocks the driver install with an unverified-publisher/signature warning, installation reports success but PhoenixSuit still never pops up, or the driver silently fails to load - this is a known issue with the bundled `AW_Driver` (`Drivers/AW_Driver/usbdrv.sys`) on modern 64-bit Windows. That driver package predates current Windows kernel-mode driver signing requirements, so Windows 10/11 can refuse to load it even though the install step appears to complete.
 
-The fix is to install a generic WinUSB driver over the device using [Zadig](https://zadig.akeo.ie/) instead of the bundled Allwinner driver:
+**Note:** don't use [Zadig](https://zadig.akeo.ie/) or any other tool to install a generic WinUSB/libusb driver here - PhoenixSuit talks to the device through its own bundled `AW_Driver`, not WinUSB, so replacing it will leave PhoenixSuit unable to see the device at all (WinUSB is the right fix for `sunxi-fel`-style open-source tools, not for PhoenixSuit specifically).
 
-1) With the SonicPad still in burning mode and connected (see step 3 above), download and run [Zadig](https://zadig.akeo.ie/) - no installation required.
-2) In Zadig, go to **Options > List All Devices** and enable it, since the SonicPad in FEL/burning mode won't show up under Zadig's default filtered view.
-3) Find the SonicPad in the device dropdown (it'll show up as an unnamed/unknown Allwinner USB device - if you're not sure which one it is, unplug the SonicPad and see which entry disappears from the list).
-4) Select **WinUSB** as the target driver (the default option in the box next to the green arrow).
-5) Click **Install Driver** (or **Replace Driver** if one is already listed) and wait for it to finish.
+The actual fix is to temporarily disable Windows' driver signature enforcement for the one boot session you need to install the driver in:
+
+1) Open **Settings > Update & Security > Recovery** (Windows 10) or **Settings > System > Recovery** (Windows 11).
+2) Under **Advanced startup**, click **Restart now**.
+3) After the reboot, choose **Troubleshoot > Advanced options > Startup Settings > Restart**.
+4) Once the PC restarts again, a numbered list of options appears - press **7** (or **F7**) for **Disable driver signature enforcement**.
+5) With the SonicPad still in burning mode and connected (see step 3 above), redo the driver install from step 4 above (Device Manager > Other Devices > Unknown Device > Update Driver > browse to the `PhoenixSuit_V1.10\Drivers` directory).
 6) Reopen PhoenixSuit - it should now detect the device and pop up its flashing prompt.
+
+This setting only applies for that one boot session and reverts automatically on the next normal restart - no permanent system change is needed.
 
 ## 5) Flash the Firmware with PhoenixSuit
 ![image](https://github.com/user-attachments/assets/72ec923c-5346-4d80-89d4-d7363c17170c)
