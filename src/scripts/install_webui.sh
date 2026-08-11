@@ -170,6 +170,14 @@ function install_webui()
     esac
 
     sudo nginx -t
+    # Enable only, don't start/restart here: install_services.sh runs
+    # this from create_rootfs.sh inside a chroot with no running init
+    # system, so `systemctl restart` would fail and abort the whole
+    # image build under `set -e`. Same reason klipper/moonraker's
+    # install scripts only ever `systemctl enable` their services -
+    # actually starting happens naturally once the image boots for
+    # real. (Caught by codex review - this line never got exercised
+    # through a real chroot build after being added, only via live
+    # post-boot installs over SSH where a restart is harmless.)
     sudo systemctl enable nginx
-    sudo systemctl restart nginx
 }

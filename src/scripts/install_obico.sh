@@ -56,12 +56,22 @@ function install_obico()
     fi
 
     cd "${obico_dir}"
+    # moonraker-obico's own install.sh (not our code) ends its -L path
+    # with `sudo systemctl restart moonraker-obico`. install_services.sh
+    # runs this from create_rootfs.sh inside a chroot with no running
+    # init system, so that restart fails and - since install.sh has its
+    # own `set -e` - takes down the whole script with a non-zero exit,
+    # which would otherwise abort the entire image build. Harmless to
+    # ignore here: install.sh already ran `systemctl enable` on the
+    # service earlier in the same script, unconditionally, so it starts
+    # correctly on first real boot regardless of whether this specific
+    # restart attempt succeeds during the chroot build.
     ./install.sh -L \
         -H 127.0.0.1 \
         -p 7125 \
         -C "${HOME}/printer_data/config/moonraker.conf" \
         -l "${HOME}/printer_data/logs" \
-        -S "https://app.obico.io"
+        -S "https://app.obico.io" || true
 
     fix_janus_live_streaming
 }
