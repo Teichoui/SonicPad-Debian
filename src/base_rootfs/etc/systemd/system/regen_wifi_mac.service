@@ -2,7 +2,7 @@
 Description=Regenerate per-device WiFi MAC address (runs once, first boot only)
 DefaultDependencies=no
 After=local-fs.target
-Before=systemd-modules-load.service sysinit.target
+Before=systemd-modules-load.service
 
 [Service]
 Type=oneshot
@@ -10,4 +10,4 @@ RemainAfterExit=yes
 ExecStart=/usr/local/bin/regen_wifi_mac.sh
 
 [Install]
-WantedBy=sysinit.target
+RequiredBy=systemd-modules-load.service

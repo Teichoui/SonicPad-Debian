@@ -22,6 +22,11 @@ then
     echo "\$BASEFS_DIR is empty"
     exit;
 fi
+if [ -z "$ROOT_PASSWORD" ]
+then
+    echo "\$ROOT_PASSWORD is empty - refusing to chpasswd root with a blank password"
+    exit 1
+fi
 
 echo "--------CONFIG---------"
 echo "L_USERNAME: $L_USERNAME"
