@@ -103,6 +103,12 @@ start_spinner "Creating default user"
     LC_ALL=C LANGUAGE=C LANG=C chroot $ROOTFS_DIR adduser --gecos "" --disabled-password $L_USERNAME
     LC_ALL=C LANGUAGE=C LANG=C chroot $ROOTFS_DIR chpasswd <<<"$L_USERNAME:$L_PASSWORD"
     LC_ALL=C LANGUAGE=C LANG=C chroot $ROOTFS_DIR /bin/bash -c "usermod -aG sudo $L_USERNAME"
+    # docs/README.md documents root:$ROOT_PASSWORD as a working default
+    # login, but nothing ever actually set root's password - debootstrap
+    # leaves the root account locked (no valid password) by default, so
+    # that documented login never worked. This is what issue #2 ("Wrong
+    # Root Password") was actually reporting.
+    LC_ALL=C LANGUAGE=C LANG=C chroot $ROOTFS_DIR chpasswd <<<"root:$ROOT_PASSWORD"
 } &> $SHELLTRAP
 stop_spinner
 

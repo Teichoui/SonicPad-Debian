@@ -27,6 +27,21 @@ $ `ssh sonic@<your-sonic-pad-ip>`
 
 The default password is `pad`. For security, no characters will show up when typing the password. You may have to type "yes" to confirm connecting for the first time.
 
+## **Setting a static IP**
+
+This image uses NetworkManager to manage all network interfaces - **editing `/etc/network/interfaces` has no effect here** and is a common source of confusion, since that's the standard approach on most other Debian systems. `/etc/network/interfaces` on this image is an empty stub; NetworkManager never reads it.
+
+To set a static IP correctly, use `nmcli` instead (replace `wlan0` with `eth0` for a wired connection, and adjust the IP/gateway/DNS for your network):
+
+```bash
+sudo nmcli con mod "$(nmcli -g GENERAL.CONNECTION device show wlan0)" \
+    ipv4.addresses 192.168.1.50/24 \
+    ipv4.gateway 192.168.1.1 \
+    ipv4.dns 192.168.1.1 \
+    ipv4.method manual
+sudo nmcli con up "$(nmcli -g GENERAL.CONNECTION device show wlan0)"
+```
+
 ## **Change Default Passwords (optional but important)**
 
 >Default Credentials:
