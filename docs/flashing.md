@@ -98,6 +98,19 @@ The screen will remain black, but the light on the side will still illuminate. T
 
 Once the drivers are installed, PhoenixSuit should pop up with a prompt. If it doesn't, try restarting the SonicPad and re-entering burning mode.
 
+### Troubleshooting: PhoenixSuit still doesn't detect the device
+
+If the steps above don't get PhoenixSuit to recognize the SonicPad in burning mode - the driver install fails, Windows blocks it with an unverified-publisher warning, or PhoenixSuit just never pops up even after a restart - this is a known issue with the bundled Allwinner USB drivers on modern Windows (10/11 enforce driver signature requirements the old Allwinner driver package predates).
+
+The fix is to install a generic WinUSB driver over the device using [Zadig](https://zadig.akeo.ie/) instead of the bundled Allwinner driver:
+
+1) With the SonicPad still in burning mode and connected (see step 3 above), download and run [Zadig](https://zadig.akeo.ie/) - no installation required.
+2) In Zadig, go to **Options > List All Devices** and enable it, since the SonicPad in FEL/burning mode won't show up under Zadig's default filtered view.
+3) Find the SonicPad in the device dropdown (it'll show up as an unnamed/unknown Allwinner USB device - if you're not sure which one it is, unplug the SonicPad and see which entry disappears from the list).
+4) Select **WinUSB** as the target driver (the default option in the box next to the green arrow).
+5) Click **Install Driver** (or **Replace Driver** if one is already listed) and wait for it to finish.
+6) Reopen PhoenixSuit - it should now detect the device and pop up its flashing prompt.
+
 ## 5) Flash the Firmware with PhoenixSuit
 ![image](https://github.com/user-attachments/assets/72ec923c-5346-4d80-89d4-d7363c17170c)
 
