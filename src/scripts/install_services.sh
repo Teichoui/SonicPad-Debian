@@ -42,6 +42,10 @@ echo "Enabling expandfs"
 sudo chmod +x /usr/local/bin/expandfs_enable.sh
 sudo systemctl enable expandfs
 
+echo "Enabling per-device WiFi MAC regeneration"
+sudo chmod +x /usr/local/bin/regen_wifi_mac.sh
+sudo systemctl enable regen_wifi_mac
+
 echo "Enabling LED EMMC"
 sudo chmod +x /usr/local/bin/ledmmc_enable.sh
 sudo systemctl enable ledmmc
