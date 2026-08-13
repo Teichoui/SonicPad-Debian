@@ -63,31 +63,54 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libc6:i386 libstdc++6:i386 zlib1g:i386
 
-      - name: Install qemu-user-static and register aarch64 binfmt with PCF flags
+      - name: Add the credentials (C) flag to the aarch64 binfmt registration
         if: steps.filter.outputs.run_build == 'true'
-        # Debian's default qemu-user-static binfmt registration is missing
-        # flags the chroot install needs - same issue and same fix
-        # documented in README.md's build troubleshooting section:
-        #   - missing C (credentials): sudo silently fails inside the
-        #     chroot, so Klipper/Moonraker/KlipperScreen/etc never
-        #     actually get installed even though the build "succeeds"
-        #   - missing P (preserve argv0): argument passing to emulated
-        #     binaries breaks (e.g. "Illegal option --")
-        # `update-binfmts --disable/--enable` does not reliably fix this -
+        # Debian's own qemu-user-static postinst registers a correct
+        # magic/mask for aarch64, but without the C (credentials) flag -
+        # without it, sudo silently fails inside the qemu-emulated chroot
+        # ("effective uid is not 0"), so Klipper/Moonraker/KlipperScreen/
+        # etc never actually get installed even though the build
+        # "succeeds". Documented in README.md's troubleshooting section;
+        # `update-binfmts --disable/--enable` doesn't reliably fix this,
         # manual re-registration is required.
+        #
+        # Installing the package here (rather than letting
+        # create_rootfs.sh's own `apt-get install qemu-user-static` do it
+        # first) means that later call is a true no-op and won't re-run
+        # the postinst and clobber this fix.
+        #
+        # Extracting the magic/mask/interpreter Debian already generated
+        # and only appending the missing flag - rather than hand-typing a
+        # byte pattern - matters: an earlier hand-typed pattern here
+        # accidentally matched the *host's own* x86_64 binaries too and
+        # broke grep/node mid-job ("Exec format error" on tools that have
+        # nothing to do with the build). Reusing Debian's own generated,
+        # already-correct-for-this-exact-package-version pattern avoids
+        # that risk entirely.
         run: |
           set -e
           sudo apt-get install -y qemu-user-static
-          test -f /usr/libexec/qemu-binfmt/aarch64-binfmt-P || { echo "P-aware qemu-binfmt wrapper not found - qemu-user-static packaging may have changed"; exit 1; }
-          echo -1 | sudo tee /proc/sys/fs/binfmt_misc/qemu-aarch64 >/dev/null || true
-          # The P flag requires the P-aware wrapper script, not the plain
-          # static binary - pointing P at qemu-aarch64-static directly
-          # mishandles the preserved argv0 the kernel passes it (this is
-          # what codex review caught: using the plain binary here would
-          # break chroot commands like debootstrap's second stage).
-          printf ':qemu-aarch64:M::\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/libexec/qemu-binfmt/aarch64-binfmt-P:PCF\n' \
-            | sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null
-          grep -i '^flags' /proc/sys/fs/binfmt_misc/qemu-aarch64
+          entry=/proc/sys/fs/binfmt_misc/qemu-aarch64
+          test -f "$entry" || { echo "qemu-aarch64 binfmt entry not found after installing qemu-user-static"; exit 1; }
+          current_flags=$(awk '/^flags/{print $2}' "$entry")
+          echo "Current flags: $current_flags"
+          case "$current_flags" in
+            *C*)
+              echo "C flag already present, nothing to do."
+              ;;
+            *)
+              magic_hex=$(awk '/^magic/{print $2}' "$entry")
+              mask_hex=$(awk '/^mask/{print $2}' "$entry")
+              interp=$(awk '/^interpreter/{print $2}' "$entry")
+              [ -n "$magic_hex" ] && [ -n "$mask_hex" ] && [ -n "$interp" ] || { echo "Could not read magic/mask/interpreter from $entry"; cat "$entry"; exit 1; }
+              magic_esc=$(echo "$magic_hex" | sed 's/\(..\)/\\x\1/g')
+              mask_esc=$(echo "$mask_hex" | sed 's/\(..\)/\\x\1/g')
+              echo -1 | sudo tee "$entry" >/dev/null
+              printf ":qemu-aarch64:M::${magic_esc}:${mask_esc}:${interp}:${current_flags}C\n" \
+                | sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null
+              ;;
+          esac
+          grep -i '^flags' "$entry"
 
       - name: Run full build (create_rootfs + pack_img)
         if: steps.filter.outputs.run_build == 'true'
