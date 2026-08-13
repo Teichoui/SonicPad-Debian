@@ -113,17 +113,20 @@ jobs:
           done < "$entry"
           echo "Parsed: interpreter=$interpreter flags=$flags offset=$offset magic=$magic mask=$mask"
 
-          case "$flags" in
-            *C*)
-              echo "C flag already present, nothing to do."
-              exit 0
-              ;;
-          esac
+          # README.md documents PCF as the minimum required flag set.
+          new_flags="$flags"
+          case "$new_flags" in *P*) ;; *) new_flags="${new_flags}P" ;; esac
+          case "$new_flags" in *C*) ;; *) new_flags="${new_flags}C" ;; esac
+          case "$new_flags" in *F*) ;; *) new_flags="${new_flags}F" ;; esac
+          if [ "$new_flags" = "$flags" ]; then
+            echo "P, C and F flags already present ($flags), nothing to do."
+            exit 0
+          fi
           [ -n "$magic" ] && [ -n "$mask" ] && [ -n "$interpreter" ] || { echo "Failed to parse $entry"; exit 1; }
 
           magic_esc=$(echo "$magic" | sed 's/\(..\)/\\x\1/g')
           mask_esc=$(echo "$mask" | sed 's/\(..\)/\\x\1/g')
-          new_entry=":qemu-aarch64:M::${magic_esc}:${mask_esc}:${interpreter}:${flags}C"
+          new_entry=":qemu-aarch64:M::${magic_esc}:${mask_esc}:${interpreter}:${new_flags}"
           echo "Writing: $new_entry"
 
           echo -1 | sudo tee "$entry" >/dev/null
