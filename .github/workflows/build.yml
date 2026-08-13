@@ -63,54 +63,32 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libc6:i386 libstdc++6:i386 zlib1g:i386
 
-      - name: Add the credentials (C) flag to the aarch64 binfmt registration
+      - name: DIAGNOSTIC - dump raw binfmt entry (no mutation)
         if: steps.filter.outputs.run_build == 'true'
-        # Debian's own qemu-user-static postinst registers a correct
-        # magic/mask for aarch64, but without the C (credentials) flag -
-        # without it, sudo silently fails inside the qemu-emulated chroot
-        # ("effective uid is not 0"), so Klipper/Moonraker/KlipperScreen/
-        # etc never actually get installed even though the build
-        # "succeeds". Documented in README.md's troubleshooting section;
-        # `update-binfmts --disable/--enable` doesn't reliably fix this,
-        # manual re-registration is required.
-        #
-        # Installing the package here (rather than letting
-        # create_rootfs.sh's own `apt-get install qemu-user-static` do it
-        # first) means that later call is a true no-op and won't re-run
-        # the postinst and clobber this fix.
-        #
-        # Extracting the magic/mask/interpreter Debian already generated
-        # and only appending the missing flag - rather than hand-typing a
-        # byte pattern - matters: an earlier hand-typed pattern here
-        # accidentally matched the *host's own* x86_64 binaries too and
-        # broke grep/node mid-job ("Exec format error" on tools that have
-        # nothing to do with the build). Reusing Debian's own generated,
-        # already-correct-for-this-exact-package-version pattern avoids
-        # that risk entirely.
+        # Two prior attempts to re-register qemu-aarch64 with the C flag
+        # both broke the runner's own host binaries (grep, then node) -
+        # even the second attempt, which extracted magic/mask/interpreter
+        # from Debian's own already-working registration instead of
+        # hand-typing bytes. Something about the read/re-encode/write
+        # round trip is wrong, but guessing further risks a third
+        # host-breaking failure. This step only reads and prints the raw
+        # file byte-for-byte (od -c, not awk/grep field-splitting, which
+        # could itself be silently assuming a wrong format) - no write,
+        # no unregister, nothing that can break anything. Once this
+        # confirms the real format, the actual fix gets written from that
+        # verified ground truth instead of another assumption.
         run: |
           set -e
           sudo apt-get install -y qemu-user-static
           entry=/proc/sys/fs/binfmt_misc/qemu-aarch64
           test -f "$entry" || { echo "qemu-aarch64 binfmt entry not found after installing qemu-user-static"; exit 1; }
-          current_flags=$(awk '/^flags/{print $2}' "$entry")
-          echo "Current flags: $current_flags"
-          case "$current_flags" in
-            *C*)
-              echo "C flag already present, nothing to do."
-              ;;
-            *)
-              magic_hex=$(awk '/^magic/{print $2}' "$entry")
-              mask_hex=$(awk '/^mask/{print $2}' "$entry")
-              interp=$(awk '/^interpreter/{print $2}' "$entry")
-              [ -n "$magic_hex" ] && [ -n "$mask_hex" ] && [ -n "$interp" ] || { echo "Could not read magic/mask/interpreter from $entry"; cat "$entry"; exit 1; }
-              magic_esc=$(echo "$magic_hex" | sed 's/\(..\)/\\x\1/g')
-              mask_esc=$(echo "$mask_hex" | sed 's/\(..\)/\\x\1/g')
-              echo -1 | sudo tee "$entry" >/dev/null
-              printf ":qemu-aarch64:M::${magic_esc}:${mask_esc}:${interp}:${current_flags}C\n" \
-                | sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null
-              ;;
-          esac
-          grep -i '^flags' "$entry"
+          echo "=== cat (plain) ==="
+          cat "$entry"
+          echo "=== od -c (byte-exact, shows real whitespace/newlines) ==="
+          od -c "$entry"
+          echo "=== wc -l ==="
+          wc -l "$entry"
+          exit 1  # fail on purpose so the diagnostic output is easy to find in a failed-step log
 
       - name: Run full build (create_rootfs + pack_img)
         if: steps.filter.outputs.run_build == 'true'
