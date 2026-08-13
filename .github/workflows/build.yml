@@ -129,15 +129,22 @@ jobs:
           new_entry=":qemu-aarch64:M::${magic_esc}:${mask_esc}:${interpreter}:${new_flags}"
           echo "Writing: $new_entry"
 
-          echo -1 | sudo tee "$entry" >/dev/null
-          printf '%s\n' "$new_entry" | sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null
+          # binfmt_misc's register interface needs the whole entry in a
+          # single write() syscall - README.md's own already-validated
+          # fix (from earlier real debugging this session) writes to a
+          # temp file first and cats that in, rather than piping through
+          # tee, for exactly this reason. Matching that exactly rather
+          # than the pipe form used in the two prior (failed) attempts.
+          printf '%s\n' "$new_entry" > /tmp/binfmt_regfix.txt
+          sudo sh -c 'echo -1 > '"$entry"
+          sudo sh -c 'cat /tmp/binfmt_regfix.txt > /proc/sys/fs/binfmt_misc/register'
 
           echo "Self-test: running grep --version (grep is the exact binary that broke in both prior attempts)..."
           if grep --version >/dev/null; then
             echo "Self-test passed."
           else
             echo "Self-test FAILED - reverting registration immediately."
-            echo -1 | sudo tee "$entry" >/dev/null || true
+            sudo sh -c 'echo -1 > '"$entry" || true
             exit 1
           fi
 
