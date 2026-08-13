@@ -63,32 +63,80 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libc6:i386 libstdc++6:i386 zlib1g:i386
 
-      - name: DIAGNOSTIC - dump raw binfmt entry (no mutation)
+      - name: List all existing binfmt_misc registrations (no mutation)
         if: steps.filter.outputs.run_build == 'true'
-        # Two prior attempts to re-register qemu-aarch64 with the C flag
-        # both broke the runner's own host binaries (grep, then node) -
-        # even the second attempt, which extracted magic/mask/interpreter
-        # from Debian's own already-working registration instead of
-        # hand-typing bytes. Something about the read/re-encode/write
-        # round trip is wrong, but guessing further risks a third
-        # host-breaking failure. This step only reads and prints the raw
-        # file byte-for-byte (od -c, not awk/grep field-splitting, which
-        # could itself be silently assuming a wrong format) - no write,
-        # no unregister, nothing that can break anything. Once this
-        # confirms the real format, the actual fix gets written from that
-        # verified ground truth instead of another assumption.
+        # Verified fact from a prior diagnostic run: the magic/mask bytes
+        # extracted from Debian's own qemu-aarch64 entry are byte-for-byte
+        # correct (confirmed via od -c) and correctly exclude x86_64 (the
+        # e_machine field is checked with a full-byte mask). So the two
+        # prior host-breaking failures were NOT caused by wrong magic/mask
+        # values. Before writing anything, checking one more verifiable
+        # fact: GitHub-hosted runners are documented to ship pre-configured
+        # binfmt_misc support for other architectures (Docker buildx
+        # multi-arch), which could mean multiple overlapping entries exist
+        # and unregistering only "qemu-aarch64" doesn't remove all of them.
+        run: |
+          echo "=== all binfmt_misc entries ==="
+          ls -la /proc/sys/fs/binfmt_misc/
+          for f in /proc/sys/fs/binfmt_misc/qemu-*; do
+            echo "--- $f ---"
+            cat "$f" 2>&1 || true
+          done
+
+      - name: Add the credentials (C) flag, with an immediate self-test and auto-revert
+        if: steps.filter.outputs.run_build == 'true'
+        # Two prior attempts to add the C flag broke the runner's own host
+        # binaries (grep, then node), even though the magic/mask bytes
+        # themselves are verified correct. The exact remaining mechanism
+        # is unconfirmed, so this write no longer just trusts itself: it
+        # tests execution immediately with a cheap external binary
+        # (/bin/true) right after registering, and if that fails, it
+        # unregisters itself immediately and exits with a clear error -
+        # rather than leaving a broken registration active for every
+        # subsequent step in the job, which is what made both prior
+        # failures cascade into breaking the Actions runner's own tooling.
         run: |
           set -e
           sudo apt-get install -y qemu-user-static
           entry=/proc/sys/fs/binfmt_misc/qemu-aarch64
           test -f "$entry" || { echo "qemu-aarch64 binfmt entry not found after installing qemu-user-static"; exit 1; }
-          echo "=== cat (plain) ==="
-          cat "$entry"
-          echo "=== od -c (byte-exact, shows real whitespace/newlines) ==="
-          od -c "$entry"
-          echo "=== wc -l ==="
-          wc -l "$entry"
-          exit 1  # fail on purpose so the diagnostic output is easy to find in a failed-step log
+
+          declare interpreter="" flags="" offset="" magic="" mask=""
+          while read -r key value; do
+            case "$key" in
+              interpreter) interpreter="$value" ;;
+              flags:) flags="$value" ;;
+              offset) offset="$value" ;;
+              magic) magic="$value" ;;
+              mask) mask="$value" ;;
+            esac
+          done < "$entry"
+          echo "Parsed: interpreter=$interpreter flags=$flags offset=$offset magic=$magic mask=$mask"
+
+          case "$flags" in
+            *C*)
+              echo "C flag already present, nothing to do."
+              exit 0
+              ;;
+          esac
+          [ -n "$magic" ] && [ -n "$mask" ] && [ -n "$interpreter" ] || { echo "Failed to parse $entry"; exit 1; }
+
+          magic_esc=$(echo "$magic" | sed 's/\(..\)/\\x\1/g')
+          mask_esc=$(echo "$mask" | sed 's/\(..\)/\\x\1/g')
+          new_entry=":qemu-aarch64:M::${magic_esc}:${mask_esc}:${interpreter}:${flags}C"
+          echo "Writing: $new_entry"
+
+          echo -1 | sudo tee "$entry" >/dev/null
+          printf '%s\n' "$new_entry" | sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null
+
+          echo "Self-test: running grep --version (grep is the exact binary that broke in both prior attempts)..."
+          if grep --version >/dev/null; then
+            echo "Self-test passed."
+          else
+            echo "Self-test FAILED - reverting registration immediately."
+            echo -1 | sudo tee "$entry" >/dev/null || true
+            exit 1
+          fi
 
       - name: Run full build (create_rootfs + pack_img)
         if: steps.filter.outputs.run_build == 'true'
