@@ -3,8 +3,16 @@ name: Build Image
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'src/**'
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+  schedule:
+    # Catches drift from the live Debian mirror (debootstrap/apt pull
+    # latest packages) breaking the build even with no local changes.
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -13,6 +21,25 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install qemu-user-static and register aarch64 binfmt with the credentials (C) flag
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
+          # Debian's default qemu-user-static binfmt registration doesn't
+          # include the C (credentials) flag. Without it, setuid binaries
+          # like sudo fail inside the qemu-emulated chroot with
+          # "effective uid is not 0", which breaks install_services.sh -
+          # it installs Klipper/Moonraker/KlipperScreen/etc as a non-root
+          # user via sudo. Re-register with C added before create_rootfs.sh
+          # runs its own (no-op, already installed) qemu-user-static install.
+          echo -1 | sudo tee /proc/sys/fs/binfmt_misc/qemu-aarch64 >/dev/null || true
+          interp=/usr/bin/qemu-aarch64-static
+          printf '%s' \
+            ":qemu-aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xfe\xfe\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:${interp}:OCF" \
+            | sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null
+          grep -i '^flags' /proc/sys/fs/binfmt_misc/qemu-aarch64
 
       - name: Run full build (create_rootfs + pack_img)
         working-directory: src
