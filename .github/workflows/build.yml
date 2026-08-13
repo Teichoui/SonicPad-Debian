@@ -105,15 +105,26 @@ jobs:
         # binaries (grep, then node), even though the magic/mask bytes
         # themselves are verified correct. The exact remaining mechanism
         # is unconfirmed, so this write no longer just trusts itself: it
-        # tests execution immediately with a cheap external binary
-        # (/bin/true) right after registering, and if that fails, it
-        # unregisters itself immediately and exits with a clear error -
+        # tests execution immediately with a cheap external binary right
+        # after registering, and if that fails, reverts immediately -
         # rather than leaving a broken registration active for every
         # subsequent step in the job, which is what made both prior
         # failures cascade into breaking the Actions runner's own tooling.
+        #
+        # Per codex review: if the new registration DOES misclassify host
+        # x86_64 binaries (the exact failure this self-test checks for),
+        # `sudo` and `sh` would be affected too, same as grep - so a
+        # revert command that has to exec a fresh `sudo sh -c ...`
+        # afterward could itself fail to run, leaving the bad registration
+        # stuck. Fixed by acquiring root ONCE at the very start (before
+        # any mutation, when exec is still guaranteed to work), then doing
+        # every subsequent read/write with bash builtins (redirects,
+        # printf) inside that already-running root shell - no new exec
+        # needed for the revert regardless of what breaks.
         run: |
+          sudo bash <<'ROOTSCRIPT'
           set -e
-          sudo apt-get install -y qemu-user-static
+          apt-get install -y qemu-user-static
           entry=/proc/sys/fs/binfmt_misc/qemu-aarch64
           test -f "$entry" || { echo "qemu-aarch64 binfmt entry not found after installing qemu-user-static"; exit 1; }
 
@@ -131,7 +142,7 @@ jobs:
 
           # README.md documents PCF as the minimum required flag set.
           new_flags="$flags"
-          case "$new_flags" in *P*) ;; *) new_flags="${new_flags}P" ;; esac
+          case "$new_flags" in *P*) ;; *) new_flags="${new_flags}P"; adding_p=1 ;; esac
           case "$new_flags" in *C*) ;; *) new_flags="${new_flags}C" ;; esac
           case "$new_flags" in *F*) ;; *) new_flags="${new_flags}F" ;; esac
           if [ "$new_flags" = "$flags" ]; then
@@ -140,29 +151,45 @@ jobs:
           fi
           [ -n "$magic" ] && [ -n "$mask" ] && [ -n "$interpreter" ] || { echo "Failed to parse $entry"; exit 1; }
 
+          # README.md's validated PCF registration pairs the P flag with
+          # the P-aware wrapper specifically (/usr/libexec/qemu-binfmt/
+          # aarch64-binfmt-P) - the preserved-argv0 convention the P flag
+          # implies isn't handled by the plain qemu-aarch64-static binary.
+          # If P is being newly added and the current interpreter isn't
+          # already that wrapper, switch to it.
+          if [ -n "${adding_p:-}" ]; then
+            case "$interpreter" in
+              */aarch64-binfmt-P) ;;
+              *)
+                p_interp=/usr/libexec/qemu-binfmt/aarch64-binfmt-P
+                test -f "$p_interp" || { echo "P-aware wrapper $p_interp not found, cannot safely add the P flag"; exit 1; }
+                interpreter="$p_interp"
+                ;;
+            esac
+          fi
+
           magic_esc=$(echo "$magic" | sed 's/\(..\)/\\x\1/g')
           mask_esc=$(echo "$mask" | sed 's/\(..\)/\\x\1/g')
           new_entry=":qemu-aarch64:M::${magic_esc}:${mask_esc}:${interpreter}:${new_flags}"
           echo "Writing: $new_entry"
 
           # binfmt_misc's register interface needs the whole entry in a
-          # single write() syscall - README.md's own already-validated
-          # fix (from earlier real debugging this session) writes to a
-          # temp file first and cats that in, rather than piping through
-          # tee, for exactly this reason. Matching that exactly rather
-          # than the pipe form used in the two prior (failed) attempts.
-          printf '%s\n' "$new_entry" > /tmp/binfmt_regfix.txt
-          sudo sh -c 'echo -1 > '"$entry"
-          sudo sh -c 'cat /tmp/binfmt_regfix.txt > /proc/sys/fs/binfmt_misc/register'
+          # single write() syscall - printf and the > redirect below are
+          # bash builtins (no fork+exec), matching what README.md's own
+          # already-validated fix does (write to a temp file / directly,
+          # not piped through an external command like tee).
+          echo -1 > "$entry"
+          printf '%s\n' "$new_entry" > /proc/sys/fs/binfmt_misc/register
 
           echo "Self-test: running grep --version (grep is the exact binary that broke in both prior attempts)..."
           if grep --version >/dev/null; then
             echo "Self-test passed."
           else
-            echo "Self-test FAILED - reverting registration immediately."
-            sudo sh -c 'echo -1 > '"$entry" || true
+            echo "Self-test FAILED - reverting registration immediately (builtin redirect, no new exec needed)."
+            echo -1 > "$entry"
             exit 1
           fi
+          ROOTSCRIPT
 
       - name: Run full build (create_rootfs + pack_img)
         if: steps.filter.outputs.run_build == 'true'
