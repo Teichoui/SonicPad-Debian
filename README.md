@@ -15,6 +15,10 @@
     <a href="https://github.com/Teichoui/SonicPad-Debian/pulls" title="PR">🚀 Contribute a new feature </a>
 </p>
 
+## 🙏 Credits
+
+This project is a fork of [Jpe230/SonicPad-Debian](https://github.com/Jpe230/SonicPad-Debian) - all credit for the original Debian-on-SonicPad port goes to [Jpe230](https://github.com/Jpe230). This fork continues active maintenance and fixes on top of that original work.
+
 ## 🚀 Features
 
 Ready to go Debian 12 Bookworm Image for the SonicPad! Allows you to install the latest, unmodified, versions of software within the Klipper ecosystem.
