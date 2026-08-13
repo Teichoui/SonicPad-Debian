@@ -15,8 +15,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@2.0.0
         with:
-          severity: warning
+          fetch-depth: 0
+
+      - name: Determine changed shell scripts
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request)
+              git diff --name-only --diff-filter=ACM "origin/${{ github.base_ref }}...HEAD" -- '*.sh' > changed.txt
+              ;;
+            push)
+              git diff --name-only --diff-filter=ACM "${{ github.event.before }}" "${{ github.sha }}" -- '*.sh' > changed.txt || git ls-files '*.sh' > changed.txt
+              ;;
+            *)
+              git ls-files '*.sh' > changed.txt
+              ;;
+          esac
+          echo "Files to check:"
+          cat changed.txt
+
+      - name: Run ShellCheck on changed files
+        run: |
+          if [ -s changed.txt ]; then
+            xargs -a changed.txt shellcheck --severity=warning
+          else
+            echo "No shell scripts changed."
+          fi
