@@ -37,12 +37,10 @@ install_packages()
     sudo apt-get update
 
     echo_text "Checking for broken packages..."
-    output=$(dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' | grep -E ^.[^nci])
-    if [ $? -eq 0 ]; then
+    if dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' | grep -qE '^.[^nci]'; then
         echo_text "Detected broken packages. Attempting to fix"
         sudo apt-get -f install
-        output=$(dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' | grep -E ^.[^nci])
-        if [ $? -eq 0 ]; then
+        if dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' | grep -qE '^.[^nci]'; then
             echo_error "Unable to fix broken packages. These must be fixed before KlipperScreen can be installed"
             exit 1
         fi
@@ -114,8 +112,9 @@ create_virtualenv()
     else
         pip --disable-pip-version-check install -r ${KSPATH}/scripts/KlipperScreen-requirements.txt
     fi
-    if [ $? -gt 0 ]; then
-        echo_error "Error: pip install exited with status code $?"
+    pip_status=$?
+    if [ "$pip_status" -gt 0 ]; then
+        echo_error "Error: pip install exited with status code $pip_status"
         echo_text "Trying again with new tools..."
         sudo apt-get install -y build-essential cmake
         if [[ "$(uname -m)" =~ armv[67]l ]]; then
@@ -250,7 +249,7 @@ EOF
 
 fix_fbturbo()
 {
-    if [ $(dpkg-query -W -f='${Status}' xserver-xorg-video-fbturbo 2>/dev/null | grep -c "ok installed") -eq 0 ];
+    if [ "$(dpkg-query -W -f='${Status}' xserver-xorg-video-fbturbo 2>/dev/null | grep -c "ok installed")" -eq 0 ];
     then
         FBCONFIG="/usr/share/X11/xorg.conf.d/99-fbturbo.conf"
         if [ -e $FBCONFIG ]
