@@ -21,12 +21,26 @@ OG_USER=${SUDO_USER:-$(whoami)}
 # ---------------------------------------
 
 # ---------------- IMG config------------
-IMG_SIZE=4000000000
+# This is scratch space for the copy step below, not the final shipped
+# image size - "Resizing img" further down runs `resize2fs -M`, which
+# shrinks the filesystem back down to just fit the actual content
+# before packing. So a generous IMG_SIZE here costs nothing on the
+# real device, it just needs to be big enough to hold the rootfs
+# during the copy.
+#
+# 4GB (the old value) was too small: a real CI build now includes
+# Klipper+Moonraker+KlipperScreen+crowsnest+moonraker-obico+Mainsail/
+# Fluidd, which measured ~5.5-6.3GB installed on a live device (verified
+# via `du -sh` over SSH, 2026-08-13) - the copy step was failing
+# partway through with "No space left on device". Bumped with headroom.
+IMG_SIZE=8000000000
 #IMG_SIZE=2684354560
 BLOCKS=4096
 INODES_RATIO=16384
 INODES=$(($IMG_SIZE / $INODES_RATIO))
 #----------------------------------------
+
+echo "Rootfs content size: $(du -sh $ROOTFS_DIR 2>/dev/null | cut -f1) (must fit within IMG_SIZE=$IMG_SIZE bytes during the copy step below)"
 
 start_spinner "Extracting kernel tools"
 {
