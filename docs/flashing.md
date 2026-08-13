@@ -98,6 +98,29 @@ The screen will remain black, but the light on the side will still illuminate. T
 
 Once the drivers are installed, PhoenixSuit should pop up with a prompt. If it doesn't, try restarting the SonicPad and re-entering burning mode.
 
+### Troubleshooting: PhoenixSuit still doesn't detect the device
+
+If the steps above don't get PhoenixSuit to recognize the SonicPad in burning mode, first confirm this is actually a driver-signing problem before doing anything below - a missing PhoenixSuit prompt can also just mean a bad cable, a port that doesn't handle the burning-mode USB descriptor, or the SonicPad not actually being in burning mode, none of which this fix addresses:
+
+1) Open **Device Manager** with the SonicPad still connected in burning mode.
+2) Find the device under **Other Devices** (or wherever it landed after the driver install) and open its **Properties**.
+3) Check the **Device status** box. If it shows **Code 52** ("Windows cannot verify the digital signature for the drivers required for this device"), that confirms the signing problem below. Any other status/error means the fix below won't help - recheck the cable, the `CAM` port, and that the device is actually in burning mode instead.
+
+Confirmed Code 52 is a known issue with the bundled `AW_Driver` (`Drivers/AW_Driver/usbdrv.sys`) on modern 64-bit Windows. That driver package predates current Windows kernel-mode driver signing requirements, so Windows 10/11 refuses to load it even though the install step appears to complete.
+
+**Note:** don't use [Zadig](https://zadig.akeo.ie/) or any other tool to install a generic WinUSB/libusb driver here - PhoenixSuit talks to the device through its own bundled `AW_Driver`, not WinUSB, so replacing it will leave PhoenixSuit unable to see the device at all (WinUSB is the right fix for `sunxi-fel`-style open-source tools, not for PhoenixSuit specifically).
+
+The actual fix is to temporarily disable Windows' driver signature enforcement for the one boot session you need to install the driver in:
+
+1) Open **Settings > Update & Security > Recovery** (Windows 10) or **Settings > System > Recovery** (Windows 11).
+2) Under **Advanced startup**, click **Restart now**.
+3) After the reboot, choose **Troubleshoot > Advanced options > Startup Settings > Restart**.
+4) Once the PC restarts again, a numbered list of options appears - press **7** (or **F7**) for **Disable driver signature enforcement**.
+5) With the SonicPad still in burning mode and connected (see step 3 above), redo the driver install from step 4 above (Device Manager > Other Devices > Unknown Device > Update Driver > browse to the `PhoenixSuit_V1.10\Drivers` directory).
+6) Reopen PhoenixSuit - it should now detect the device and pop up its flashing prompt.
+
+This setting only applies for that one boot session and reverts automatically on the next normal restart - no permanent system change is needed.
+
 ## 5) Flash the Firmware with PhoenixSuit
 ![image](https://github.com/user-attachments/assets/72ec923c-5346-4d80-89d4-d7363c17170c)
 
