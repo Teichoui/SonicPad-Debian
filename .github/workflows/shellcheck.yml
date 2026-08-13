@@ -1,15 +1,15 @@
 name: Shellcheck
 
 on:
+  # No path filter on the trigger: the job needs to always run and
+  # report a status in case this is ever made a required check - a
+  # path-filtered-out check stays permanently pending on non-matching
+  # PRs and blocks merges under branch protection (same reasoning as
+  # build.yml). The steps below already skip cleanly when nothing
+  # relevant changed.
   pull_request:
-    paths:
-      - '**.sh'
-      - '.github/workflows/shellcheck.yml'
   push:
     branches: [main]
-    paths:
-      - '**.sh'
-      - '.github/workflows/shellcheck.yml'
   workflow_dispatch:
 
 jobs:
