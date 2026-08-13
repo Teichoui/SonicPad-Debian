@@ -28,6 +28,7 @@ echo 'CONFIG_MACH_LINUX=y' > .config
 make olddefconfig
 make
 sudo ./scripts/flash-linux.sh out/
+sudo systemctl restart klipper-mcu
 ```
 
 > The original instructions here used `make menuconfig`, an interactive terminal menu where you'd select "Linux process" by hand. That doesn't work over most SSH clients/scripts (no real TUI), so the commands above write the same choice directly to `.config` and let `make olddefconfig` fill in the rest non-interactively - functionally identical result, just doesn't require an interactive terminal. If you *are* at a real interactive terminal and prefer the menu, `make menuconfig` still works; just select "Linux process" as the Micro-controller Architecture.
