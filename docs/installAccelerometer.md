@@ -15,8 +15,8 @@ sudo apt install binutils-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-no
 ```bash
 # Install Klipper MCU service to Systemd
 sudo cp ~/klipper/scripts/klipper-mcu.service /etc/systemd/system/
+sudo systemctl daemon-reload
 sudo systemctl enable klipper-mcu.service
-systemctl daemon-reload
 ```
 
 Build and flash `klipper-mcu` (the "Linux process" MCU target - this runs as its own service on the Sonic Pad itself and talks to the accelerometer over SPI, separate from the printer's own MCU connection):
@@ -37,7 +37,7 @@ Verify it's running before moving on:
 
 ```bash
 systemctl is-active klipper-mcu   # should print "active"
-ls -la /tmp/klipper_host_mcu      # should exist
+[ -S /tmp/klipper_host_mcu ] && echo "socket OK" || echo "MISSING - check klipper-mcu logs"
 ```
 
 Add the following to the `printer.cfg`
@@ -65,11 +65,11 @@ You can now use the accelerometer to measure resonance. If you run into errors w
 The accelerometer needs to be moved between two mounting points across two separate runs, since on a bed-slinger printer (like the stock Ender 3 S1) the toolhead moves for X/Z but the bed itself moves for Y:
 
 1) Mount the accelerometer on the **toolhead** (as rigidly as possible - it needs to move exactly with the nozzle, no wobble), home the printer (`G28`), then run:
-   ```
+   ```text
    SHAPER_CALIBRATE AXIS=X
    ```
 2) Move the accelerometer to the **bed** (taped down or clipped near center), home again, then run:
-   ```
+   ```text
    SHAPER_CALIBRATE AXIS=Y
    ```
 3) Once both are done, run `SAVE_CONFIG` to persist the results (`shaper_type_x/y`, `shaper_freq_x/y`) into `printer.cfg` and restart Klipper.
@@ -103,7 +103,7 @@ make: *** [Makefile:116: menuconfig] Error 1
 To remedy, run the following commands and select "en_US UTF8"
 
 ```
+sudo dpkg-reconfigure locales
 export LC_ALL="en_US.UTF-8"
 export LC_CTYPE="en_US.UTF-8"
-sudo dpkg-reconfigure locales
 ```
