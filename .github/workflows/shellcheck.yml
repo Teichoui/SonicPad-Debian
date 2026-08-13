@@ -24,7 +24,6 @@ jobs:
         id: filter
         run: |
           workflow_changed=""
-          full_scan=false
           case "${{ github.event_name }}" in
             pull_request)
               git diff -z --name-only --diff-filter=ACMR "origin/${{ github.base_ref }}...HEAD" -- '*.sh' > changed.txt
@@ -36,35 +35,34 @@ jobs:
               ;;
             *)
               git ls-files -z '*.sh' > changed.txt
-              full_scan=true
               ;;
           esac
           if [ -n "$workflow_changed" ]; then
-            # This workflow file itself changed - a diff against '*.sh'
-            # won't touch any actual script, but a broken shellcheck
-            # command/filter change should still fail a real check
-            # rather than merge with nothing ever actually invoked.
-            echo "shellcheck.yml changed - checking all shell scripts to actually exercise the check."
-            git ls-files -z '*.sh' > changed.txt
-            full_scan=true
+            echo "self_test=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "self_test=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "full_scan=$full_scan" >> "$GITHUB_OUTPUT"
-          echo "Files to check:"
+          echo "Changed files (strict warning-level check):"
           tr '\0' '\n' < changed.txt
 
       - name: Run ShellCheck on changed files
+        # Kept independent of the self-test below - a PR that touches both
+        # this workflow AND a real .sh file should still get the stricter
+        # warning-level check on the file it actually changed, not just
+        # the looser error-only repo-wide self-test.
         run: |
-          if [ ! -s changed.txt ]; then
-            echo "No shell scripts changed."
-            exit 0
-          fi
-          if [ "${{ steps.filter.outputs.full_scan }}" = "true" ]; then
-            # Repo-wide scan (manual/scheduled run, or this workflow file
-            # itself changed) - the repo has pre-existing warning-level
-            # debt unrelated to any given change, so only fail on actual
-            # errors here. Real PRs that touch specific scripts still get
-            # the stricter warning-level check above.
-            xargs -0 -a changed.txt shellcheck --severity=error
-          else
+          if [ -s changed.txt ]; then
             xargs -0 -a changed.txt shellcheck --severity=warning
+          else
+            echo "No shell scripts changed."
           fi
+
+      - name: Self-test - exercise shellcheck against all scripts
+        if: steps.filter.outputs.self_test == 'true'
+        # This workflow file itself changed. Editing it doesn't touch any
+        # .sh file, so the check above would otherwise report success
+        # without ever actually invoking shellcheck - a broken command or
+        # filter change could merge undetected. Repo-wide scan, but at
+        # --severity=error rather than warning, since the repo has
+        # pre-existing warning-level debt unrelated to any given change.
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck --severity=error
