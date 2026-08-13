@@ -80,6 +80,26 @@ stop_spinner
 
 echo "Done running second stage"
 
+# Bind-mount /proc, /sys, /dev into the chroot. Without this, anything
+# relying on /proc/self/fd inside the chroot silently breaks - this is
+# what "E: Can not write log (Is /dev/pts mounted?) - posix_openpt"
+# has been warning about (harmlessly) in every apt call below, and
+# what makes crowsnest's install script hard-fail later with
+# "/dev/fd/63: No such file or directory" (it uses bash process
+# substitution, `<(...)`, which needs /proc/self/fd to resolve
+# /dev/fd/N). Standard practice for any real chroot build.
+cleanup_chroot_mounts() {
+    umount -l "$ROOTFS_DIR/dev/pts" 2>/dev/null || true
+    umount -l "$ROOTFS_DIR/dev" 2>/dev/null || true
+    umount -l "$ROOTFS_DIR/proc" 2>/dev/null || true
+    umount -l "$ROOTFS_DIR/sys" 2>/dev/null || true
+}
+trap cleanup_chroot_mounts EXIT
+mount --bind /dev "$ROOTFS_DIR/dev"
+mount -t devpts devpts "$ROOTFS_DIR/dev/pts"
+mount -t proc proc "$ROOTFS_DIR/proc"
+mount -t sysfs sysfs "$ROOTFS_DIR/sys"
+
 # # 3) Installing packages
 start_spinner "Installing packages"
 {
