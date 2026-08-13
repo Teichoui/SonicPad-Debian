@@ -1,0 +1,87 @@
+name: Shellcheck
+
+on:
+  # No path filter on the trigger: the job needs to always run and
+  # report a status in case this is ever made a required check - a
+  # path-filtered-out check stays permanently pending on non-matching
+  # PRs and blocks merges under branch protection (same reasoning as
+  # build.yml). The steps below already skip cleanly when nothing
+  # relevant changed.
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine changed shell scripts
+        id: filter
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          workflow_changed=""
+          full_scan=false
+          case "${{ github.event_name }}" in
+            pull_request)
+              git diff -z --name-only --diff-filter=ACMR "origin/$BASE_REF...HEAD" -- '*.sh' > changed.txt
+              workflow_changed="$(git diff --name-only --diff-filter=ACMR "origin/$BASE_REF...HEAD" -- '.github/workflows/shellcheck.yml')"
+              ;;
+            push)
+              git diff -z --name-only --diff-filter=ACMR "${{ github.event.before }}" "${{ github.sha }}" -- '*.sh' > changed.txt || git ls-files -z '*.sh' > changed.txt
+              workflow_changed="$(git diff --name-only --diff-filter=ACMR "${{ github.event.before }}" "${{ github.sha }}" -- '.github/workflows/shellcheck.yml' 2>/dev/null || true)"
+              ;;
+            *)
+              # workflow_dispatch/schedule: a full-repo scan, not a real
+              # diff - the repo has pre-existing warning-level debt
+              # unrelated to any given change, so this needs error-only
+              # severity too, same as the self-test below.
+              git ls-files -z '*.sh' > changed.txt
+              full_scan=true
+              ;;
+          esac
+          if [ -n "$workflow_changed" ]; then
+            echo "self_test=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "self_test=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "full_scan=$full_scan" >> "$GITHUB_OUTPUT"
+          echo "Changed files:"
+          tr '\0' '\n' < changed.txt
+
+      - name: Run ShellCheck on changed files
+        # Kept independent of the self-test below - a PR that touches both
+        # this workflow AND a real .sh file should still get the stricter
+        # warning-level check on the file it actually changed, not just
+        # the looser error-only repo-wide self-test. Manual/scheduled
+        # runs (full_scan=true) use error-only severity instead, since
+        # they're checking the whole repo rather than an actual diff.
+        run: |
+          if [ ! -s changed.txt ]; then
+            echo "No shell scripts changed."
+            exit 0
+          fi
+          if [ "${{ steps.filter.outputs.full_scan }}" = "true" ]; then
+            xargs -0 -a changed.txt shellcheck --severity=error --
+          else
+            xargs -0 -a changed.txt shellcheck --severity=warning --
+          fi
+
+      - name: Self-test - exercise shellcheck against all scripts
+        if: steps.filter.outputs.self_test == 'true'
+        # This workflow file itself changed. Editing it doesn't touch any
+        # .sh file, so the check above would otherwise report success
+        # without ever actually invoking shellcheck - a broken command or
+        # filter change could merge undetected. Repo-wide scan, but at
+        # --severity=error rather than warning, since the repo has
+        # pre-existing warning-level debt unrelated to any given change.
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck --severity=error --

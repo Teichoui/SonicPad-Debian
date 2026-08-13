@@ -16,6 +16,18 @@ function install_nginx()
     # write, so it doesn't expose directory listings or file contents
     # beyond what nginx's own config explicitly serves.
     chmod o+x "${HOME}"
+
+    # nginx auto-sizes map_hash_bucket_size from the CPU's cache-line
+    # size at startup. Under qemu-user-static aarch64 emulation (how
+    # this image is built, since the build host is x86_64) that probe
+    # can come back wrong, landing on a default too small to even hold
+    # write_webui_nginx_site()'s small $expires map below - confirmed
+    # via a real build failure: "could not build map_hash, you should
+    # increase map_hash_bucket_size: 32". Setting it explicitly avoids
+    # depending on that auto-detection at all.
+    sudo tee /etc/nginx/conf.d/map_hash_bucket_size.conf > /dev/null <<'EOF'
+map_hash_bucket_size 128;
+EOF
 }
 
 function write_webui_nginx_site()
