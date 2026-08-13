@@ -47,8 +47,14 @@ jobs:
         run: |
           set -e
           sudo apt-get install -y qemu-user-static
+          test -f /usr/libexec/qemu-binfmt/aarch64-binfmt-P || { echo "P-aware qemu-binfmt wrapper not found - qemu-user-static packaging may have changed"; exit 1; }
           echo -1 | sudo tee /proc/sys/fs/binfmt_misc/qemu-aarch64 >/dev/null || true
-          printf ':qemu-aarch64:M::\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:PCF\n' \
+          # The P flag requires the P-aware wrapper script, not the plain
+          # static binary - pointing P at qemu-aarch64-static directly
+          # mishandles the preserved argv0 the kernel passes it (this is
+          # what codex review caught: using the plain binary here would
+          # break chroot commands like debootstrap's second stage).
+          printf ':qemu-aarch64:M::\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/libexec/qemu-binfmt/aarch64-binfmt-P:PCF\n' \
             | sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null
           grep -i '^flags' /proc/sys/fs/binfmt_misc/qemu-aarch64
 
