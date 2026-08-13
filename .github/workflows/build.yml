@@ -20,24 +20,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine whether src/** changed
+      - name: Determine whether the build is actually affected
         # The job always runs (no path filter on the trigger) so this can
         # be used as a required status check - a path-filtered-out check
         # stays permanently pending on non-matching PRs and blocks merges
         # under branch protection. Instead, always report a status, and
-        # only skip the expensive build steps when nothing under src/
-        # changed (docs-only PRs, workflow-only PRs, etc).
+        # only skip the expensive build steps when nothing that affects
+        # the build changed (docs-only PRs, other workflows, etc). This
+        # workflow file itself counts - a PR that breaks these commands
+        # should not be able to merge with a green check that never
+        # actually ran them.
         id: filter
         run: |
+          PATHS=('src/**' '.github/workflows/build.yml')
           case "${{ github.event_name }}" in
             pull_request)
-              changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- 'src/**')"
+              changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- "${PATHS[@]}")"
               ;;
             push)
-              changed="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'src/**' 2>/dev/null || echo 'src/**')"
+              changed="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- "${PATHS[@]}" 2>/dev/null || echo "${PATHS[0]}")"
               ;;
             *)
-              changed="src/** (scheduled or manually dispatched run)"
+              changed="${PATHS[0]} (scheduled or manually dispatched run)"
               ;;
           esac
           if [ -n "$changed" ]; then
