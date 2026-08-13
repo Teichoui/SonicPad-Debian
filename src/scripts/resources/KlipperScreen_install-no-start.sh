@@ -189,6 +189,10 @@ create_policy()
     echo_text "Installing PolicyKit Rules to ${RULE_FILE}..."
 
     KS_GID=$( getent group klipperscreen | awk -F: '{printf "%d", $3}' )
+    # shellcheck disable=SC1087
+    # The heredoc body below is JavaScript (a polkit rule file), not
+    # bash - "$KS_GID[\s\0]" is a JS regex character class, not an
+    # attempted bash array expansion.
     sudo /bin/sh -c "cat > ${RULE_FILE}" << EOF
 // Allow KlipperScreen to reboot, shutdown, etc
 polkit.addRule(function(action, subject) {
