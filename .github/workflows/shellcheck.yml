@@ -22,22 +22,22 @@ jobs:
         run: |
           case "${{ github.event_name }}" in
             pull_request)
-              git diff --name-only --diff-filter=ACM "origin/${{ github.base_ref }}...HEAD" -- '*.sh' > changed.txt
+              git diff -z --name-only --diff-filter=ACMR "origin/${{ github.base_ref }}...HEAD" -- '*.sh' > changed.txt
               ;;
             push)
-              git diff --name-only --diff-filter=ACM "${{ github.event.before }}" "${{ github.sha }}" -- '*.sh' > changed.txt || git ls-files '*.sh' > changed.txt
+              git diff -z --name-only --diff-filter=ACMR "${{ github.event.before }}" "${{ github.sha }}" -- '*.sh' > changed.txt || git ls-files -z '*.sh' > changed.txt
               ;;
             *)
-              git ls-files '*.sh' > changed.txt
+              git ls-files -z '*.sh' > changed.txt
               ;;
           esac
           echo "Files to check:"
-          cat changed.txt
+          tr '\0' '\n' < changed.txt
 
       - name: Run ShellCheck on changed files
         run: |
           if [ -s changed.txt ]; then
-            xargs -a changed.txt shellcheck --severity=warning
+            xargs -0 -a changed.txt shellcheck --severity=warning
           else
             echo "No shell scripts changed."
           fi
