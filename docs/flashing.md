@@ -100,7 +100,13 @@ Once the drivers are installed, PhoenixSuit should pop up with a prompt. If it d
 
 ### Troubleshooting: PhoenixSuit still doesn't detect the device
 
-If the steps above don't get PhoenixSuit to recognize the SonicPad in burning mode - Windows blocks the driver install with an unverified-publisher/signature warning, installation reports success but PhoenixSuit still never pops up, or the driver silently fails to load - this is a known issue with the bundled `AW_Driver` (`Drivers/AW_Driver/usbdrv.sys`) on modern 64-bit Windows. That driver package predates current Windows kernel-mode driver signing requirements, so Windows 10/11 can refuse to load it even though the install step appears to complete.
+If the steps above don't get PhoenixSuit to recognize the SonicPad in burning mode, first confirm this is actually a driver-signing problem before doing anything below - a missing PhoenixSuit prompt can also just mean a bad cable, a port that doesn't handle the burning-mode USB descriptor, or the SonicPad not actually being in burning mode, none of which this fix addresses:
+
+1) Open **Device Manager** with the SonicPad still connected in burning mode.
+2) Find the device under **Other Devices** (or wherever it landed after the driver install) and open its **Properties**.
+3) Check the **Device status** box. If it shows **Code 52** ("Windows cannot verify the digital signature for the drivers required for this device"), that confirms the signing problem below. Any other status/error means the fix below won't help - recheck the cable, the `CAM` port, and that the device is actually in burning mode instead.
+
+Confirmed Code 52 is a known issue with the bundled `AW_Driver` (`Drivers/AW_Driver/usbdrv.sys`) on modern 64-bit Windows. That driver package predates current Windows kernel-mode driver signing requirements, so Windows 10/11 refuses to load it even though the install step appears to complete.
 
 **Note:** don't use [Zadig](https://zadig.akeo.ie/) or any other tool to install a generic WinUSB/libusb driver here - PhoenixSuit talks to the device through its own bundled `AW_Driver`, not WinUSB, so replacing it will leave PhoenixSuit unable to see the device at all (WinUSB is the right fix for `sunxi-fel`-style open-source tools, not for PhoenixSuit specifically).
 
