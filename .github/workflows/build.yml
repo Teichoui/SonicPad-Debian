@@ -1,0 +1,36 @@
+name: Build Image
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run full build (create_rootfs + pack_img)
+        working-directory: src
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          sudo -E ./build.sh
+
+      - name: Verify output image exists
+        working-directory: src
+        run: |
+          test -f out/debian_r818_sonic_lcd_uart0.img
+          ls -lh out/debian_r818_sonic_lcd_uart0.img
+
+      - name: Upload built image
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian_r818_sonic_lcd_uart0
+          path: src/out/debian_r818_sonic_lcd_uart0.img
+          retention-days: 3
+          if-no-files-found: ignore
