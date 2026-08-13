@@ -51,6 +51,22 @@ jobs:
             echo "No src/** changes - skipping full build."
           fi
 
+      - name: Free disk space
+        if: steps.filter.outputs.run_build == 'true'
+        # Verified via a real full run: the build got all the way through
+        # installing Klipper/Moonraker/KlipperScreen/web UI (~25 minutes)
+        # and then failed packing the final image with "No space left on
+        # device". GitHub-hosted runners ship with large preinstalled
+        # toolchains (dotnet, Android SDK, GHC, etc.) that eat most of the
+        # free disk space by default and aren't needed for this build.
+        run: |
+          echo "Before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL "$AGENT_TOOLSDIRECTORY" || true
+          sudo docker image prune -a -f || true
+          echo "After cleanup:"
+          df -h /
+
       - name: Install 32-bit runtime for the bundled dragon packer
         if: steps.filter.outputs.run_build == 'true'
         # prebuilt_kernel/tools/dragon (used by pack_img.sh) is a 32-bit
