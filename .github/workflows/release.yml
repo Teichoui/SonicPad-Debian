@@ -154,7 +154,13 @@ jobs:
         working-directory: src/out
         run: |
           mkdir -p verify
-          zip -FF debian_r818_sonic_lcd_uart0.zip -O /tmp/combined.zip
+          # zip -FF is repair/salvage mode for a BROKEN archive, not
+          # split-to-single conversion for a valid one - confirmed by real
+          # testing (codex review) that it produces empty/garbage/
+          # truncated output here, which matches a corruption this exact
+          # command reproduced manually on real hardware earlier. The
+          # documented conversion path (zip -h2) is `-s 0 --out`.
+          zip debian_r818_sonic_lcd_uart0.zip -s 0 --out /tmp/combined.zip
           unzip -o /tmp/combined.zip -d verify
           # create_release.sh (run from src/) passes zip the relative path
           # ./out/debian_r818_sonic_lcd_uart0.img, so that's the member
