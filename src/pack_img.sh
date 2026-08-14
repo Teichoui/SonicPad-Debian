@@ -62,11 +62,26 @@ stop_spinner
 
 echo "Done creating ext4 partition"
 
+echo "=== Hard-link stats in source rootfs (diagnosing image size) ==="
+hardlinked_files=$(find $ROOTFS_DIR -type f -links +1 2>/dev/null | wc -l)
+echo "Files with more than 1 hard link: $hardlinked_files"
+if [ "$hardlinked_files" -gt 0 ]; then
+    apparent_extra=$(find $ROOTFS_DIR -type f -links +1 -printf '%s\n' 2>/dev/null | awk '{sum+=$1} END {print sum+0}')
+    echo "Combined size of those files (each additional link duplicates this if not preserved): ${apparent_extra} bytes"
+fi
+
 start_spinner "Copying partitions"
 {
     mkdir -p $MOUNT_POINT
     mount -o loop $ROOTFS_IMG $MOUNT_POINT
-    cp -rfp $ROOTFS_DIR/* $MOUNT_POINT
+    # cp -rfp does NOT preserve hard links (-p only covers mode/
+    # ownership/timestamps) - a real Debian install hard-links many
+    # files (docs, locale data, etc), so without -a/--preserve=links
+    # each additional link gets copied as an independent full file,
+    # inflating the final image well beyond the source's actual
+    # (hard-link-deduplicated) du -sh size. -a is a superset of -rfp
+    # that also preserves links/symlinks.
+    cp -a $ROOTFS_DIR/* $MOUNT_POINT
     umount $MOUNT_POINT
     rm -r $MOUNT_POINT
 } &> $SHELLTRAP
