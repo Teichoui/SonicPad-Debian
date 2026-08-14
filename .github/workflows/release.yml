@@ -153,7 +153,6 @@ jobs:
         # shipping a broken release asset.
         working-directory: src/out
         run: |
-          mkdir -p verify
           # zip -FF is repair/salvage mode for a BROKEN archive, not
           # split-to-single conversion for a valid one - confirmed by real
           # testing (codex review) that it produces empty/garbage/
@@ -161,21 +160,31 @@ jobs:
           # command reproduced manually on real hardware earlier. The
           # documented conversion path (zip -h2) is `-s 0 --out`.
           zip debian_r818_sonic_lcd_uart0.zip -s 0 --out /tmp/combined.zip
-          unzip -o /tmp/combined.zip -d verify
-          # create_release.sh (run from src/) passes zip the relative path
-          # ./out/debian_r818_sonic_lcd_uart0.img, so that's the member
-          # path stored in the archive and where it extracts to here -
-          # not directly under verify/.
+          # Debian's unzip 6.0 hits "invalid compressed data to inflate" /
+          # "possible zip bomb" on this specific archive - a real, known
+          # Info-Zip unzip limitation with ZIP64 entries near/above 4GB,
+          # confirmed by switching extraction to Python's zipfile module
+          # (correct ZIP64 support) and getting a clean checksum match.
+          # Hashing the entry's decompressed stream directly also means
+          # no second full extracted copy needs to sit on disk at all.
           orig_sum=$(cut -d' ' -f1 debian_r818_sonic_lcd_uart0.img.sha256)
-          new_sum=$(sha256sum verify/out/debian_r818_sonic_lcd_uart0.img | cut -d' ' -f1)
-          echo "Original: $orig_sum"
+          new_sum=$(python3 -c "
+          import zipfile, hashlib
+          with zipfile.ZipFile('/tmp/combined.zip') as zf:
+              with zf.open('out/debian_r818_sonic_lcd_uart0.img') as f:
+                  h = hashlib.sha256()
+                  for chunk in iter(lambda: f.read(8 * 1024 * 1024), b''):
+                      h.update(chunk)
+                  print(h.hexdigest())
+          ")
+          echo "Original:    $orig_sum"
           echo "Reassembled: $new_sum"
           if [ "$orig_sum" != "$new_sum" ]; then
             echo "Split archive verification FAILED - checksums do not match"
             exit 1
           fi
           echo "Split archive verified OK"
-          rm -rf verify /tmp/combined.zip
+          rm -f /tmp/combined.zip
 
       - name: Create GitHub Release
         working-directory: src/out
