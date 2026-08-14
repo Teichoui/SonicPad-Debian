@@ -124,6 +124,11 @@ jobs:
       - name: Split image into a multi-part zip (GitHub release assets cap at 2GB)
         working-directory: src
         run: |
+          # pack_img.sh's mkdir -p out/ ran as root (via sudo -E ./build.sh)
+          # and only chowns the final .img file, not the containing
+          # directory - reclaim it so the non-root steps below can write
+          # the checksum and split zip files into it.
+          sudo chown -R "$(id -u):$(id -g)" out
           sha256sum out/debian_r818_sonic_lcd_uart0.img > out/debian_r818_sonic_lcd_uart0.img.sha256
           bash create_release.sh
           ls -la out/
