@@ -93,6 +93,9 @@ start_spinner "Resizing img"
 stop_spinner
 
 echo "Done Resizing img"
+echo "=== ext4 stats after resize2fs -M (diagnosing why the final image is larger than the actual rootfs content) ==="
+dumpe2fs -h $ROOTFS_IMG 2>&1 || true
+ls -la $ROOTFS_IMG
 
 start_spinner "Packing image"
 {
