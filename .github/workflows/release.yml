@@ -137,8 +137,12 @@ jobs:
           mkdir -p verify
           zip -FF debian_r818_sonic_lcd_uart0.zip -O /tmp/combined.zip
           unzip -o /tmp/combined.zip -d verify
+          # create_release.sh (run from src/) passes zip the relative path
+          # ./out/debian_r818_sonic_lcd_uart0.img, so that's the member
+          # path stored in the archive and where it extracts to here -
+          # not directly under verify/.
           orig_sum=$(cut -d' ' -f1 debian_r818_sonic_lcd_uart0.img.sha256)
-          new_sum=$(sha256sum verify/debian_r818_sonic_lcd_uart0.img | cut -d' ' -f1)
+          new_sum=$(sha256sum verify/out/debian_r818_sonic_lcd_uart0.img | cut -d' ' -f1)
           echo "Original: $orig_sum"
           echo "Reassembled: $new_sum"
           if [ "$orig_sum" != "$new_sum" ]; then
