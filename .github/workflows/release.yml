@@ -1,0 +1,174 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.1-bookworm) - created if it does not exist'
+        required: true
+      title:
+        description: 'Release title (defaults to the tag)'
+        required: false
+      prerelease:
+        description: 'Mark as a pre-release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Steps below mirror build.yml's proven-working build - see that
+      # file for the full history/reasoning behind each one. Kept as a
+      # separate copy rather than a shared/reusable workflow so this
+      # never risks touching the already-verified build.yml.
+
+      - name: Free disk space
+        run: |
+          echo "Before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL "$AGENT_TOOLSDIRECTORY" || true
+          sudo docker image prune -a -f || true
+          echo "After cleanup:"
+          df -h /
+
+      - name: Install 32-bit runtime for the bundled dragon packer
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y libc6:i386 libstdc++6:i386 zlib1g:i386
+
+      - name: Add the credentials (C) flag, with an immediate self-test and auto-revert
+        run: |
+          sudo bash <<'ROOTSCRIPT'
+          set -e
+          apt-get install -y qemu-user-static
+          entry=/proc/sys/fs/binfmt_misc/qemu-aarch64
+          test -f "$entry" || { echo "qemu-aarch64 binfmt entry not found after installing qemu-user-static"; exit 1; }
+
+          declare interpreter="" flags="" offset="" magic="" mask=""
+          while read -r key value; do
+            case "$key" in
+              interpreter) interpreter="$value" ;;
+              flags:) flags="$value" ;;
+              offset) offset="$value" ;;
+              magic) magic="$value" ;;
+              mask) mask="$value" ;;
+            esac
+          done < "$entry"
+          echo "Parsed: interpreter=$interpreter flags=$flags offset=$offset magic=$magic mask=$mask"
+
+          new_flags="$flags"
+          case "$new_flags" in *P*) ;; *) new_flags="${new_flags}P"; adding_p=1 ;; esac
+          case "$new_flags" in *C*) ;; *) new_flags="${new_flags}C" ;; esac
+          case "$new_flags" in *F*) ;; *) new_flags="${new_flags}F" ;; esac
+          if [ "$new_flags" = "$flags" ]; then
+            echo "P, C and F flags already present ($flags), nothing to do."
+            exit 0
+          fi
+          [ -n "$magic" ] && [ -n "$mask" ] && [ -n "$interpreter" ] || { echo "Failed to parse $entry"; exit 1; }
+
+          if [ -n "${adding_p:-}" ]; then
+            case "$interpreter" in
+              */aarch64-binfmt-P) ;;
+              *)
+                p_interp=/usr/libexec/qemu-binfmt/aarch64-binfmt-P
+                test -f "$p_interp" || { echo "P-aware wrapper $p_interp not found, cannot safely add the P flag"; exit 1; }
+                interpreter="$p_interp"
+                ;;
+            esac
+          fi
+
+          magic_esc=$(echo "$magic" | sed 's/\(..\)/\\x\1/g')
+          mask_esc=$(echo "$mask" | sed 's/\(..\)/\\x\1/g')
+          new_entry=":qemu-aarch64:M::${magic_esc}:${mask_esc}:${interpreter}:${new_flags}"
+          echo "Writing: $new_entry"
+
+          echo -1 > "$entry"
+          printf '%s\n' "$new_entry" > /proc/sys/fs/binfmt_misc/register
+
+          echo "Self-test: running grep --version..."
+          if grep --version >/dev/null; then
+            echo "Self-test passed."
+          else
+            echo "Self-test FAILED - reverting registration immediately."
+            echo -1 > "$entry"
+            exit 1
+          fi
+          ROOTSCRIPT
+
+      - name: Run full build (create_rootfs + pack_img)
+        working-directory: src
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          # install_webui.sh prompts whether to also install Fluidd
+          # alongside Mainsail - answer "no" so the build doesn't hang
+          # waiting on stdin that will never come in CI.
+          echo "n" | sudo -E ./build.sh
+
+      - name: Verify output image exists
+        working-directory: src
+        run: |
+          test -f out/debian_r818_sonic_lcd_uart0.img
+          ls -lh out/debian_r818_sonic_lcd_uart0.img
+
+      - name: Split image into a multi-part zip (GitHub release assets cap at 2GB)
+        working-directory: src
+        run: |
+          sha256sum out/debian_r818_sonic_lcd_uart0.img > out/debian_r818_sonic_lcd_uart0.img.sha256
+          bash create_release.sh
+          ls -la out/
+
+      - name: Verify the split archive reassembles correctly
+        # create_release.sh's zip -s split has no built-in verification -
+        # recombine and checksum-compare against the original before ever
+        # publishing, so a bad split fails this workflow instead of
+        # shipping a broken release asset.
+        working-directory: src/out
+        run: |
+          mkdir -p verify
+          zip -FF debian_r818_sonic_lcd_uart0.zip -O /tmp/combined.zip
+          unzip -o /tmp/combined.zip -d verify
+          orig_sum=$(cut -d' ' -f1 debian_r818_sonic_lcd_uart0.img.sha256)
+          new_sum=$(sha256sum verify/debian_r818_sonic_lcd_uart0.img | cut -d' ' -f1)
+          echo "Original: $orig_sum"
+          echo "Reassembled: $new_sum"
+          if [ "$orig_sum" != "$new_sum" ]; then
+            echo "Split archive verification FAILED - checksums do not match"
+            exit 1
+          fi
+          echo "Split archive verified OK"
+          rm -rf verify /tmp/combined.zip
+
+      - name: Create GitHub Release
+        working-directory: src/out
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TITLE: ${{ inputs.title }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          title="${RELEASE_TITLE:-$RELEASE_TAG}"
+          extra_flag=()
+          [ "$PRERELEASE" = "true" ] && extra_flag+=(--prerelease)
+          # Number of .zNN split parts depends on the built image's actual
+          # compressed size, which varies between builds - glob for
+          # whatever create_release.sh actually produced rather than
+          # assuming a fixed count.
+          shopt -s nullglob
+          assets=(debian_r818_sonic_lcd_uart0.zip debian_r818_sonic_lcd_uart0.z[0-9][0-9] debian_r818_sonic_lcd_uart0.img.sha256)
+          echo "Uploading: ${assets[*]}"
+          gh release create "$RELEASE_TAG" \
+            "${assets[@]}" \
+            --title "$title" \
+            --target "${{ github.sha }}" \
+            --notes "Debian 12 (bookworm) image for the Creality Sonic Pad. This project is a fork of [Jpe230/SonicPad-Debian](https://github.com/Jpe230/SonicPad-Debian) - full credit to Jpe230 for the original port. See [docs/flashing.md](https://github.com/${{ github.repository }}/blob/main/docs/flashing.md) for install instructions (it's a multi-part zip - download all \`.zip\`/\`.z01\`/\`.z02\`/\`.z03\` files and extract with a real archive tool, not \`unzip\`)." \
+            "${extra_flag[@]}"
