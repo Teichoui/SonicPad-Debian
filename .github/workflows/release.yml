@@ -121,6 +121,19 @@ jobs:
           test -f out/debian_r818_sonic_lcd_uart0.img
           ls -lh out/debian_r818_sonic_lcd_uart0.img
 
+      - name: Free build intermediates before splitting/verifying
+        # rootfs/, prebuilt_kernel/ and temp/ are no longer needed once
+        # out/*.img exists, and the verification step below needs extra
+        # headroom (a full extracted copy of the image, plus the
+        # recombined zip) - clean these up first rather than relying on
+        # margin alone, since disk space has been a real, confirmed
+        # failure mode for this build before (see build.yml history).
+        working-directory: src
+        run: |
+          df -h /
+          sudo rm -rf rootfs prebuilt_kernel temp
+          df -h /
+
       - name: Split image into a multi-part zip (GitHub release assets cap at 2GB)
         working-directory: src
         run: |
