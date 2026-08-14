@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # Steps below mirror build.yml's proven-working build - see that
       # file for the full history/reasoning behind each one. Kept as a
@@ -174,5 +175,5 @@ jobs:
             "${assets[@]}" \
             --title "$title" \
             --target "${{ github.sha }}" \
-            --notes "Debian 12 (bookworm) image for the Creality Sonic Pad. This project is a fork of [Jpe230/SonicPad-Debian](https://github.com/Jpe230/SonicPad-Debian) - full credit to Jpe230 for the original port. See [docs/flashing.md](https://github.com/${{ github.repository }}/blob/main/docs/flashing.md) for install instructions (it's a multi-part zip - download all \`.zip\`/\`.z01\`/\`.z02\`/\`.z03\` files and extract with a real archive tool, not \`unzip\`)." \
+            --notes "Debian 12 (bookworm) image for the Creality Sonic Pad. This project is a fork of [Jpe230/SonicPad-Debian](https://github.com/Jpe230/SonicPad-Debian) - full credit to Jpe230 for the original port. See [docs/flashing.md](https://github.com/${{ github.repository }}/blob/main/docs/flashing.md) for install instructions (it's a multi-part zip - download **all** \`.zip\`/\`.zNN\` files attached below and extract with a real archive tool, not \`unzip\`)." \
             "${extra_flag[@]}"
