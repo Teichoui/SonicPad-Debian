@@ -62,11 +62,36 @@ stop_spinner
 
 echo "Done creating ext4 partition"
 
+echo "=== Hard-link stats in source rootfs (diagnosing image size) ==="
+hardlinked_files=$(find $ROOTFS_DIR -type f -links +1 2>/dev/null | wc -l)
+echo "Files with more than 1 hard link: $hardlinked_files"
+if [ "$hardlinked_files" -gt 0 ]; then
+    # Group by device:inode so each hard-linked file's size is counted
+    # once, not once per pathname - only the (links - 1) *extra* copies
+    # are what -p (without -a) would actually duplicate on disk. Links
+    # to a target outside $ROOTFS_DIR aren't visible to this find, so
+    # they're naturally excluded already.
+    apparent_extra=$(find $ROOTFS_DIR -type f -links +1 -printf '%D:%i %s\n' 2>/dev/null | \
+        awk '{count[$1]++; size[$1]=$2} END {sum=0; for (k in count) sum += (count[k]-1)*size[k]; print sum+0}')
+    echo "Extra bytes duplicated if hard links are not preserved: ${apparent_extra} bytes"
+fi
+
 start_spinner "Copying partitions"
 {
     mkdir -p $MOUNT_POINT
     mount -o loop $ROOTFS_IMG $MOUNT_POINT
-    cp -rfp $ROOTFS_DIR/* $MOUNT_POINT
+    # cp -rfp does NOT preserve hard links (-p only covers mode/
+    # ownership/timestamps) - a real Debian install hard-links many
+    # files (docs, locale data, etc), so without -a/--preserve=links
+    # each additional link gets copied as an independent full file,
+    # inflating the final image well beyond the source's actual
+    # (hard-link-deduplicated) du -sh size. -a is a superset of -rfp
+    # that also preserves links/symlinks.
+    # Trailing /. copies $ROOTFS_DIR's *contents* (including root-level
+    # dotfiles, which the earlier $ROOTFS_DIR/* glob silently skipped -
+    # bash doesn't match dotfiles without dotglob) into $MOUNT_POINT,
+    # rather than $ROOTFS_DIR itself.
+    cp -a "$ROOTFS_DIR"/. $MOUNT_POINT
     umount $MOUNT_POINT
     rm -r $MOUNT_POINT
 } &> $SHELLTRAP
@@ -93,6 +118,9 @@ start_spinner "Resizing img"
 stop_spinner
 
 echo "Done Resizing img"
+echo "=== ext4 stats after resize2fs -M (diagnosing why the final image is larger than the actual rootfs content) ==="
+dumpe2fs -h $ROOTFS_IMG 2>&1 || true
+ls -la $ROOTFS_IMG
 
 start_spinner "Packing image"
 {
