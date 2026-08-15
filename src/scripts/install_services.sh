@@ -2,7 +2,9 @@
 
 set -e
 
+# shellcheck disable=SC2034 # consumed by install_klipper.sh/install_klipperscreen.sh/install_moonraker.sh, sourced below into this same shell
 INSTALLER_DIR="$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")"
+# shellcheck disable=SC2034 # consumed by install_klipper.sh/install_moonraker.sh, sourced below into this same shell
 SYSTEMD="/etc/systemd/system"
 USER=$(whoami)
 
