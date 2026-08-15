@@ -134,10 +134,7 @@ jobs:
           sudo rm -rf rootfs prebuilt_kernel temp
           df -h /
 
-      - name: Install p7zip
-        run: sudo apt-get install -y p7zip-full
-
-      - name: Compress image into a 7z archive
+      - name: Compress image into a zip archive
         working-directory: src
         run: |
           # pack_img.sh's mkdir -p out/ ran as root (via sudo -E ./build.sh)
@@ -154,18 +151,17 @@ jobs:
           ls -la out/
 
       - name: Verify the archive extracts correctly
-        # create_release.sh's 7z archive has no built-in verification -
-        # extract and checksum-compare against the original before ever
-        # publishing. (This used to be a zip -s split/rejoin instead -
-        # dropped after real testing proved Info-Zip's split-to-single
+        # create_release.sh's zip has no built-in verification - extract
+        # and checksum-compare against the original before ever
+        # publishing. (This used to be a zip -s split/rejoin - dropped
+        # after real testing proved Info-Zip's split-to-single
         # conversion corrupts the archive whenever one entry's
-        # compressed data spans multiple volumes, independent of the
-        # 4GB ZIP64 threshold. Not split into multiple volumes at all
-        # anymore either - see create_release.sh for why - so there's
-        # no reassembly step here, just a normal single-file extract.)
+        # compressed data spans multiple volumes. See create_release.sh
+        # for why this is a plain, unsplit zip now - that conversion
+        # code path is never touched by a normal extract like this one.)
         working-directory: src/out
         run: |
-          7z x debian_r818_sonic_lcd_uart0.7z -o/tmp/extracted
+          unzip -q debian_r818_sonic_lcd_uart0.zip -d /tmp/extracted
           orig_sum=$(cut -d' ' -f1 debian_r818_sonic_lcd_uart0.img.sha256)
           new_sum=$(sha256sum /tmp/extracted/debian_r818_sonic_lcd_uart0.img | cut -d' ' -f1)
           echo "Original:    $orig_sum"
@@ -188,11 +184,11 @@ jobs:
           title="${RELEASE_TITLE:-$RELEASE_TAG}"
           extra_flag=()
           [ "$PRERELEASE" = "true" ] && extra_flag+=(--prerelease)
-          assets=(debian_r818_sonic_lcd_uart0.7z debian_r818_sonic_lcd_uart0.img.sha256)
+          assets=(debian_r818_sonic_lcd_uart0.zip debian_r818_sonic_lcd_uart0.img.sha256)
           echo "Uploading: ${assets[*]}"
           gh release create "$RELEASE_TAG" \
             "${assets[@]}" \
             --title "$title" \
             --target "${{ github.sha }}" \
-            --notes "Debian 12 (bookworm) image for the Creality Sonic Pad. This project is a fork of [Jpe230/SonicPad-Debian](https://github.com/Jpe230/SonicPad-Debian) - full credit to Jpe230 for the original port. See [docs/flashing.md](https://github.com/${{ github.repository }}/blob/main/docs/flashing.md) for install instructions (extract \`debian_r818_sonic_lcd_uart0.7z\` with [7-Zip](https://7-zip.org) or another 7z-compatible tool)." \
+            --notes "Debian 12 (bookworm) image for the Creality Sonic Pad. This project is a fork of [Jpe230/SonicPad-Debian](https://github.com/Jpe230/SonicPad-Debian) - full credit to Jpe230 for the original port. See [docs/flashing.md](https://github.com/${{ github.repository }}/blob/main/docs/flashing.md) for install instructions (extract \`debian_r818_sonic_lcd_uart0.zip\` with your OS's built-in zip support, or any zip tool)." \
             "${extra_flag[@]}"
