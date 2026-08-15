@@ -64,9 +64,7 @@ $ `sudo apt-get update && sudo apt-get upgrade`
 
 ## **Install other 3D Printing Software with KIAUH**
 
-SonicPad-Debian comes preinstalled with KIAUH the Klipper Installation And Update Helper. This will allow you to easily install or remove software like Klipper, Moonraker, Mainsail, Fluid, Crowsnest, and others. You can install and run KIAUH using the following commands:
-
-> **as of release v1.0, KIUAH no longer comes packaged**
+KIAUH, the Klipper Installation And Update Helper, will allow you to easily install or remove software like Klipper, Moonraker, Mainsail, Fluidd, Crowsnest, moonraker-obico, and others. It does **not** come preinstalled (as of release v1.0) - clone and run it yourself using the following commands:
 
 $ `cd ~ && git clone https://github.com/dw-0/kiauh.git`
 
@@ -83,6 +81,8 @@ Follow the onscreen instructions to install the software you want.
 *Fluidd* - web frontend for printer control (install one or both)
 
 *KlipperScreen* - provides GUI for Sonic Pad screen
+
+*moonraker-obico* - opt-in cloud/self-hosted AI print-failure detection and remote monitoring (not preinstalled, install via KIAUH). After installing it, also run `/usr/local/bin/fix_obico_janus_streaming.sh` once - the Sonic Pad's board isn't recognized by moonraker-obico's live-streaming component out of the box, and this fixes it (otherwise the dashboard falls back to a slow snapshot image instead of real video).
 
 ## **Configure Installed Software**
 You should be able to configure the software you have installed by editing config files located in the  `/home/sonic/printer_data/config` directory.
