@@ -17,11 +17,9 @@ The original documentation can be found in the [`officialInstructions/` director
 ### 1) Obtain the firmware
 > ⚠️ Should you ever need to go back to the official Creality firmware, images can be found in the [CrealityOfficial/Creality_Sonic_Pad_Firmware](https://github.com/CrealityOfficial/Creality_Sonic_Pad_Firmware/) repository ⚠️
 
-1) From the [SonicPad-Debian GitHub Releases page](https://github.com/Teichoui/SonicPad-Debian/releases/), download **every** `debian_r818_sonic_lcd_uart0.7z.NNN` file attached to the release (e.g. `.7z.001`, `.7z.002`, ...) into the same folder, plus the `.img.sha256` file if you want to verify the extracted image afterward.
+1) From the [SonicPad-Debian GitHub Releases page](https://github.com/Teichoui/SonicPad-Debian/releases/), download `debian_r818_sonic_lcd_uart0.7z`, plus the `.img.sha256` file if you want to verify the extracted image afterward.
 
->This is a multi-volume 7z archive: the contents are spread across all the numbered files, and you need all of them in the same folder to extract anything. The number of volumes varies by release, depending on the built image's size.
-
-2. Extract `debian_r818_sonic_lcd_uart0.7z.001` with [7-Zip](https://7-zip.org) (Windows) or another tool that understands multi-volume 7z archives (e.g. `7z x debian_r818_sonic_lcd_uart0.7z.001` on MacOS/Linux with `p7zip` installed) - it automatically finds and uses the rest of the volumes in the same folder. This produces a file called `debian_r818_sonic_lcd_uart0.img`.
+2. Extract `debian_r818_sonic_lcd_uart0.7z` with [7-Zip](https://7-zip.org) (Windows) or another 7z-compatible tool (e.g. `7z x debian_r818_sonic_lcd_uart0.7z` on MacOS/Linux with `p7zip` installed). This produces a file called `debian_r818_sonic_lcd_uart0.img`.
 
 Keep track of this file, as we'll need it later.
 
