@@ -145,7 +145,11 @@ jobs:
           # directory - reclaim it so the non-root steps below can write
           # the checksum and archive volumes into it.
           sudo chown -R "$(id -u):$(id -g)" out
-          sha256sum out/debian_r818_sonic_lcd_uart0.img > out/debian_r818_sonic_lcd_uart0.img.sha256
+          # Recorded filename must be the portable "debian_r818_..." name,
+          # not "out/debian_r818_...", or `sha256sum -c` fails for a user
+          # who has both files in the same folder (as docs/flashing.md
+          # tells them to) - sha256sum records exactly the path it's given.
+          (cd out && sha256sum debian_r818_sonic_lcd_uart0.img > debian_r818_sonic_lcd_uart0.img.sha256)
           bash create_release.sh
           ls -la out/
 

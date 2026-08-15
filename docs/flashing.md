@@ -23,6 +23,8 @@ The original documentation can be found in the [`officialInstructions/` director
 
 Keep track of this file, as we'll need it later.
 
+>To verify the extracted image, put `debian_r818_sonic_lcd_uart0.img` and `debian_r818_sonic_lcd_uart0.img.sha256` in the same folder and run `sha256sum -c debian_r818_sonic_lcd_uart0.img.sha256` (MacOS/Linux) or `CertUtil -hashfile debian_r818_sonic_lcd_uart0.img SHA256` (Windows, then compare the output by eye against the `.sha256` file's contents).
+
 
 >The next steps are platform dependent. Click to skip to the section relevant for your operating system.
 >- [Windows](#windows)
