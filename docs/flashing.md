@@ -17,16 +17,13 @@ The original documentation can be found in the [`officialInstructions/` director
 ### 1) Obtain the firmware
 > ⚠️ Should you ever need to go back to the official Creality firmware, images can be found in the [CrealityOfficial/Creality_Sonic_Pad_Firmware](https://github.com/CrealityOfficial/Creality_Sonic_Pad_Firmware/) repository ⚠️
 
-1) Download these three files from the [SonicPad Debian GitHub Releases Page](https://github.com/Jpe230/SonicPad-Debian/releases/):
-    - [`debian_r818_sonic_lcd_uart0.zip`](https://github.com/Jpe230/SonicPad-Debian/releases/download/v1.0-bullseye/debian_r818_sonic_lcd_uart0.zip)
-    - [`debian_r818_sonic_lcd_uart0.z01`](https://github.com/Jpe230/SonicPad-Debian/releases/download/v1.0-bullseye/debian_r818_sonic_lcd_uart0.z01)
-    - [`debian_r818_sonic_lcd_uart0.z02`](https://github.com/Jpe230/SonicPad-Debian/releases/download/v1.0-bullseye/debian_r818_sonic_lcd_uart0.z02)
+1) From the [SonicPad-Debian GitHub Releases page](https://github.com/Teichoui/SonicPad-Debian/releases/), download `debian_r818_sonic_lcd_uart0.7z`, plus the `.img.sha256` file if you want to verify the extracted image afterward.
 
->If you haven't seen it before, this is a multi part zip file. That is, the contents of the zip are spread out throughout the three files and you need all three to extract the full contents. 
-
-2. Unzip the main `.zip` file, you will find a file inside called `debian_r818_sonic_lcd_uart0.img`
+2. Extract `debian_r818_sonic_lcd_uart0.7z` with [7-Zip](https://7-zip.org) (Windows) or another 7z-compatible tool (e.g. `7z x debian_r818_sonic_lcd_uart0.7z` on MacOS/Linux with `p7zip` installed). This produces a file called `debian_r818_sonic_lcd_uart0.img`.
 
 Keep track of this file, as we'll need it later.
+
+>To verify the extracted image, put `debian_r818_sonic_lcd_uart0.img` and `debian_r818_sonic_lcd_uart0.img.sha256` in the same folder and run `sha256sum -c debian_r818_sonic_lcd_uart0.img.sha256` (MacOS/Linux) or `CertUtil -hashfile debian_r818_sonic_lcd_uart0.img SHA256` (Windows, then compare the output by eye against the `.sha256` file's contents).
 
 
 >The next steps are platform dependent. Click to skip to the section relevant for your operating system.

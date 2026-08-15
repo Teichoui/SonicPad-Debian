@@ -121,7 +121,7 @@ jobs:
           test -f out/debian_r818_sonic_lcd_uart0.img
           ls -lh out/debian_r818_sonic_lcd_uart0.img
 
-      - name: Free build intermediates before splitting/verifying
+      - name: Free build intermediates before compressing/verifying
         # rootfs/, prebuilt_kernel/ and temp/ are no longer needed once
         # out/*.img exists, and the verification step below needs extra
         # headroom (a full extracted copy of the image, plus the
@@ -134,57 +134,48 @@ jobs:
           sudo rm -rf rootfs prebuilt_kernel temp
           df -h /
 
-      - name: Split image into a multi-part zip (GitHub release assets cap at 2GB)
+      - name: Install p7zip
+        run: sudo apt-get install -y p7zip-full
+
+      - name: Compress image into a 7z archive
         working-directory: src
         run: |
           # pack_img.sh's mkdir -p out/ ran as root (via sudo -E ./build.sh)
           # and only chowns the final .img file, not the containing
           # directory - reclaim it so the non-root steps below can write
-          # the checksum and split zip files into it.
+          # the checksum and archive volumes into it.
           sudo chown -R "$(id -u):$(id -g)" out
-          sha256sum out/debian_r818_sonic_lcd_uart0.img > out/debian_r818_sonic_lcd_uart0.img.sha256
+          # Recorded filename must be the portable "debian_r818_..." name,
+          # not "out/debian_r818_...", or `sha256sum -c` fails for a user
+          # who has both files in the same folder (as docs/flashing.md
+          # tells them to) - sha256sum records exactly the path it's given.
+          (cd out && sha256sum debian_r818_sonic_lcd_uart0.img > debian_r818_sonic_lcd_uart0.img.sha256)
           bash create_release.sh
           ls -la out/
 
-      - name: Verify the split archive reassembles correctly
-        # create_release.sh's zip -s split has no built-in verification -
-        # recombine and checksum-compare against the original before ever
-        # publishing, so a bad split fails this workflow instead of
-        # shipping a broken release asset.
+      - name: Verify the archive extracts correctly
+        # create_release.sh's 7z archive has no built-in verification -
+        # extract and checksum-compare against the original before ever
+        # publishing. (This used to be a zip -s split/rejoin instead -
+        # dropped after real testing proved Info-Zip's split-to-single
+        # conversion corrupts the archive whenever one entry's
+        # compressed data spans multiple volumes, independent of the
+        # 4GB ZIP64 threshold. Not split into multiple volumes at all
+        # anymore either - see create_release.sh for why - so there's
+        # no reassembly step here, just a normal single-file extract.)
         working-directory: src/out
         run: |
-          # zip -FF is repair/salvage mode for a BROKEN archive, not
-          # split-to-single conversion for a valid one - confirmed by real
-          # testing (codex review) that it produces empty/garbage/
-          # truncated output here, which matches a corruption this exact
-          # command reproduced manually on real hardware earlier. The
-          # documented conversion path (zip -h2) is `-s 0 --out`.
-          zip debian_r818_sonic_lcd_uart0.zip -s 0 --out /tmp/combined.zip
-          # Debian's unzip 6.0 hits "invalid compressed data to inflate" /
-          # "possible zip bomb" on this specific archive - a real, known
-          # Info-Zip unzip limitation with ZIP64 entries near/above 4GB,
-          # confirmed by switching extraction to Python's zipfile module
-          # (correct ZIP64 support) and getting a clean checksum match.
-          # Hashing the entry's decompressed stream directly also means
-          # no second full extracted copy needs to sit on disk at all.
+          7z x debian_r818_sonic_lcd_uart0.7z -o/tmp/extracted
           orig_sum=$(cut -d' ' -f1 debian_r818_sonic_lcd_uart0.img.sha256)
-          new_sum=$(python3 -c "
-          import zipfile, hashlib
-          with zipfile.ZipFile('/tmp/combined.zip') as zf:
-              with zf.open('out/debian_r818_sonic_lcd_uart0.img') as f:
-                  h = hashlib.sha256()
-                  for chunk in iter(lambda: f.read(8 * 1024 * 1024), b''):
-                      h.update(chunk)
-                  print(h.hexdigest())
-          ")
+          new_sum=$(sha256sum /tmp/extracted/debian_r818_sonic_lcd_uart0.img | cut -d' ' -f1)
           echo "Original:    $orig_sum"
-          echo "Reassembled: $new_sum"
+          echo "Extracted:   $new_sum"
           if [ "$orig_sum" != "$new_sum" ]; then
-            echo "Split archive verification FAILED - checksums do not match"
+            echo "Archive verification FAILED - checksums do not match"
             exit 1
           fi
-          echo "Split archive verified OK"
-          rm -f /tmp/combined.zip
+          echo "Archive verified OK"
+          rm -rf /tmp/extracted
 
       - name: Create GitHub Release
         working-directory: src/out
@@ -197,16 +188,11 @@ jobs:
           title="${RELEASE_TITLE:-$RELEASE_TAG}"
           extra_flag=()
           [ "$PRERELEASE" = "true" ] && extra_flag+=(--prerelease)
-          # Number of .zNN split parts depends on the built image's actual
-          # compressed size, which varies between builds - glob for
-          # whatever create_release.sh actually produced rather than
-          # assuming a fixed count.
-          shopt -s nullglob
-          assets=(debian_r818_sonic_lcd_uart0.zip debian_r818_sonic_lcd_uart0.z[0-9][0-9] debian_r818_sonic_lcd_uart0.img.sha256)
+          assets=(debian_r818_sonic_lcd_uart0.7z debian_r818_sonic_lcd_uart0.img.sha256)
           echo "Uploading: ${assets[*]}"
           gh release create "$RELEASE_TAG" \
             "${assets[@]}" \
             --title "$title" \
             --target "${{ github.sha }}" \
-            --notes "Debian 12 (bookworm) image for the Creality Sonic Pad. This project is a fork of [Jpe230/SonicPad-Debian](https://github.com/Jpe230/SonicPad-Debian) - full credit to Jpe230 for the original port. See [docs/flashing.md](https://github.com/${{ github.repository }}/blob/main/docs/flashing.md) for install instructions (it's a multi-part zip - download **all** \`.zip\`/\`.zNN\` files attached below and extract with a real archive tool, not \`unzip\`)." \
+            --notes "Debian 12 (bookworm) image for the Creality Sonic Pad. This project is a fork of [Jpe230/SonicPad-Debian](https://github.com/Jpe230/SonicPad-Debian) - full credit to Jpe230 for the original port. See [docs/flashing.md](https://github.com/${{ github.repository }}/blob/main/docs/flashing.md) for install instructions (extract \`debian_r818_sonic_lcd_uart0.7z\` with [7-Zip](https://7-zip.org) or another 7z-compatible tool)." \
             "${extra_flag[@]}"
