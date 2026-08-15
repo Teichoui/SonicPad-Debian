@@ -84,6 +84,8 @@ Follow the onscreen instructions to install the software you want.
 
 *KlipperScreen* - provides GUI for Sonic Pad screen
 
+*moonraker-obico* - opt-in cloud/self-hosted AI print-failure detection and remote monitoring (not preinstalled, install via KIAUH). After installing it, also run `/usr/local/bin/fix_obico_janus_streaming.sh` once - the Sonic Pad's board isn't recognized by moonraker-obico's live-streaming component out of the box, and this fixes it (otherwise the dashboard falls back to a slow snapshot image instead of real video).
+
 ## **Configure Installed Software**
 You should be able to configure the software you have installed by editing config files located in the  `/home/sonic/printer_data/config` directory.
 

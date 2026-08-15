@@ -14,7 +14,6 @@ source ./install_moonraker.sh
 source ./install_klipperscreen.sh
 source ./install_webui.sh
 source ./install_crowsnest.sh
-source ./install_obico.sh
 
 echo "Installing Klipper"
 install_klipper
@@ -31,8 +30,13 @@ install_webui
 echo "Installing crowsnest (webcam streamer)"
 install_crowsnest
 
-echo "Installing moonraker-obico (AI print failure detection)"
-install_obico
+# moonraker-obico (AI print failure detection) is NOT installed here -
+# it's opt-in, same as Fluidd, but pulled from the device itself rather
+# than baked into the image: KIAUH (see docs/README.md) already has a
+# moonraker-obico extension. base_rootfs/usr/local/bin/fix_obico_janus_
+# streaming.sh ships on every image regardless, so that path works
+# correctly once a user installs it - see that script for why.
+sudo chmod +x /usr/local/bin/fix_obico_janus_streaming.sh
 
 echo "Enabling depmod service"
 sudo chmod +x /usr/local/bin/depmod_enable.sh

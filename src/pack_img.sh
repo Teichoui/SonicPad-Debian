@@ -29,10 +29,13 @@ OG_USER=${SUDO_USER:-$(whoami)}
 # during the copy.
 #
 # 4GB (the old value) was too small: a real CI build now includes
-# Klipper+Moonraker+KlipperScreen+crowsnest+moonraker-obico+Mainsail/
-# Fluidd, which measured ~5.5-6.3GB installed on a live device (verified
-# via `du -sh` over SSH, 2026-08-13) - the copy step was failing
-# partway through with "No space left on device". Bumped with headroom.
+# Klipper+Moonraker+KlipperScreen+crowsnest+Mainsail (moonraker-obico
+# is opt-in, installed later via KIAUH - not baked in), which measured
+# ~5.5-6.3GB installed on a live device (verified via `du -sh` over
+# SSH, 2026-08-13, before obico became opt-in) - the copy step was
+# failing partway through with "No space left on device". Bumped with
+# headroom; harmless to be generous here even now that obico is gone,
+# since this is scratch space, not the final image size.
 IMG_SIZE=8000000000
 #IMG_SIZE=2684354560
 BLOCKS=4096

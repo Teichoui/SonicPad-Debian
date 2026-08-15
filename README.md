@@ -210,9 +210,15 @@ echo 'PYTHONPATH=/home/'"$USER"'/printer_data/pyfix' | sudo tee -a ~/printer_dat
 sudo systemctl restart moonraker
 ```
 
-### 4. Linking Obico after install
+### 4. Installing and linking Obico (optional)
 
-`moonraker-obico` is installed automatically (pointed at the Obico Cloud, `https://app.obico.io`, by default) but is **not** linked to any account - linking associates one specific printer with one specific person's account, so it can't be done at image-build time. To link:
+`moonraker-obico` (AI print-failure detection / remote monitoring) is **not** preinstalled - as of the opt-in change, it's pulled from the device itself via KIAUH, the same way as Fluidd (see [docs/README.md](docs/README.md)):
+
+```bash
+cd ~/kiauh && ./kiauh.sh
+```
+
+Pick moonraker-obico from KIAUH's extension list. It installs pointed at the Obico Cloud (`https://app.obico.io`) by default but is **not** linked to any account - linking associates one specific printer with one specific person's account, so it can't be automated. To link:
 
 ```bash
 cd ~/moonraker-obico
@@ -227,14 +233,12 @@ To use a self-hosted Obico server instead of the cloud, edit the `url` under `[s
 
 ### 5. Live webcam streaming in Obico
 
-Obico's dashboard needs Janus (a WebRTC server) for a real live video feed - without it, it falls back to periodic snapshot polling ("Real-time stream unavailable, showing last captured image"). This is fixed automatically by `install_obico.sh`, which:
-- Symlinks the bundled `rpi.debian.12.64-bit` Janus binaries to the variant name the Sonic Pad's board actually resolves to (`NA.debian.12.64-bit`) - moonraker-obico's board detection only recognizes Raspberry Pi/Makerbase hardware via the devicetree model string, so it never finds a match on Allwinner boards otherwise, even though the binaries themselves are just plain aarch64/Debian 12 ELFs with no genuine Pi dependency.
-- Installs the Janus binary's missing shared library dependencies (`libconfig9`, `libnice10`, `libsrtp2-1`, `libusrsctp2`) - confirmed via `ldd` that these aren't pulled in by anything else this project installs.
+Obico's dashboard needs Janus (a WebRTC server) for a real live video feed - without it, it falls back to periodic snapshot polling ("Real-time stream unavailable, showing last captured image"). moonraker-obico's board detection only recognizes Raspberry Pi/Makerbase hardware via the devicetree model string, so it never finds a match on the Sonic Pad's Allwinner board, even though the bundled `rpi.debian.12.64-bit` Janus binaries are just plain aarch64/Debian 12 ELFs with no genuine Pi dependency and run fine here.
 
-If you're on an image built before this fix landed, apply it manually:
+**After installing moonraker-obico via KIAUH, run this once** (it ships on every image regardless of whether Obico is installed):
 
 ```bash
-ln -sf rpi.debian.12.64-bit ~/moonraker-obico/moonraker_obico/bin/janus/precomplied/NA.debian.12.64-bit
-sudo apt-get install --yes libconfig9 libnice10 libsrtp2-1 libusrsctp2
-sudo systemctl restart moonraker-obico
+/usr/local/bin/fix_obico_janus_streaming.sh
 ```
+
+It symlinks the bundled Janus binaries to the variant name the Sonic Pad's board actually resolves to (`NA.debian.12.64-bit`) and installs the binary's missing shared library dependencies (`libconfig9`, `libnice10`, `libsrtp2-1`, `libusrsctp2` - confirmed via `ldd` that these aren't pulled in by anything else this project installs), then prompts you to restart the service.
