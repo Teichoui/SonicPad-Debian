@@ -19,7 +19,7 @@ The original documentation can be found in the [`officialInstructions/` director
 
 1) From the [SonicPad-Debian GitHub Releases page](https://github.com/Teichoui/SonicPad-Debian/releases/), download `debian_r818_sonic_lcd_uart0.zip`, plus the `.img.sha256` file if you want to verify the extracted image afterward.
 
-2. Extract `debian_r818_sonic_lcd_uart0.zip` - Windows (File Explorer's built-in "Extract All"), MacOS (Archive Utility, double-click), and most Linux desktops can all open a `.zip` with no extra software. This produces a file called `debian_r818_sonic_lcd_uart0.img`.
+2. Extract `debian_r818_sonic_lcd_uart0.zip` - Windows (File Explorer's built-in "Extract All"), macOS (Archive Utility, double-click), and most Linux desktops can all open a `.zip` with no extra software. This produces a file called `debian_r818_sonic_lcd_uart0.img`.
 
 Keep track of this file, as we'll need it later.
 
