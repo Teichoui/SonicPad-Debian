@@ -241,4 +241,4 @@ Obico's dashboard needs Janus (a WebRTC server) for a real live video feed - wit
 /usr/local/bin/fix_obico_janus_streaming.sh
 ```
 
-It symlinks the bundled Janus binaries to the variant name the Sonic Pad's board actually resolves to (`NA.debian.12.64-bit`) and installs the binary's missing shared library dependencies (`libconfig9`, `libnice10`, `libsrtp2-1`, `libusrsctp2` - confirmed via `ldd` that these aren't pulled in by anything else this project installs), then prompts you to restart the service.
+It symlinks the bundled Janus binaries to the variant name the Sonic Pad's board actually resolves to (`NA.debian.12.64-bit`) and installs the binary's missing shared library dependencies (`libconfig9`, `libnice10`, `libsrtp2-1`, `libusrsctp2` - confirmed via `ldd` that these aren't pulled in by anything else this project installs), then prints the command to restart the service (`sudo systemctl restart moonraker-obico`) - it doesn't restart it for you, since moonraker-obico may not even be running yet the first time this is run.

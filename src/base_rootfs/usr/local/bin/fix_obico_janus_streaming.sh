@@ -34,7 +34,21 @@ if [ ! -d "${obico_dir}" ]; then
 fi
 
 janus_precompiled_dir="${obico_dir}/moonraker_obico/bin/janus/precomplied"
-ln -sf rpi.debian.12.64-bit "${janus_precompiled_dir}/NA.debian.12.64-bit"
+janus_source="${janus_precompiled_dir}/rpi.debian.12.64-bit"
+janus_link="${janus_precompiled_dir}/NA.debian.12.64-bit"
+
+if [ ! -d "${janus_source}" ]; then
+    echo "${janus_source} not found - moonraker-obico's bundled Janus layout may have changed since this script was written. Not safe to continue."
+    exit 1
+fi
+
+ln -sf rpi.debian.12.64-bit "${janus_link}"
+
+if [ ! -e "${janus_link}/bin/janus" ] || [ ! -d "${janus_link}/lib" ]; then
+    echo "${janus_link} does not resolve to a usable Janus install (missing bin/janus or lib/) - moonraker-obico's bundled layout may have changed since this script was written."
+    exit 1
+fi
+
 sudo apt-get install --yes libconfig9 libnice10 libsrtp2-1 libusrsctp2
 
 echo "Done - restart moonraker-obico to pick this up: sudo systemctl restart moonraker-obico"
