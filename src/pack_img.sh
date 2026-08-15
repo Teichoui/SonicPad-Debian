@@ -66,8 +66,14 @@ echo "=== Hard-link stats in source rootfs (diagnosing image size) ==="
 hardlinked_files=$(find $ROOTFS_DIR -type f -links +1 2>/dev/null | wc -l)
 echo "Files with more than 1 hard link: $hardlinked_files"
 if [ "$hardlinked_files" -gt 0 ]; then
-    apparent_extra=$(find $ROOTFS_DIR -type f -links +1 -printf '%s\n' 2>/dev/null | awk '{sum+=$1} END {print sum+0}')
-    echo "Combined size of those files (each additional link duplicates this if not preserved): ${apparent_extra} bytes"
+    # Group by device:inode so each hard-linked file's size is counted
+    # once, not once per pathname - only the (links - 1) *extra* copies
+    # are what -p (without -a) would actually duplicate on disk. Links
+    # to a target outside $ROOTFS_DIR aren't visible to this find, so
+    # they're naturally excluded already.
+    apparent_extra=$(find $ROOTFS_DIR -type f -links +1 -printf '%D:%i %s\n' 2>/dev/null | \
+        awk '{count[$1]++; size[$1]=$2} END {sum=0; for (k in count) sum += (count[k]-1)*size[k]; print sum+0}')
+    echo "Extra bytes duplicated if hard links are not preserved: ${apparent_extra} bytes"
 fi
 
 start_spinner "Copying partitions"
@@ -81,7 +87,11 @@ start_spinner "Copying partitions"
     # inflating the final image well beyond the source's actual
     # (hard-link-deduplicated) du -sh size. -a is a superset of -rfp
     # that also preserves links/symlinks.
-    cp -a $ROOTFS_DIR/* $MOUNT_POINT
+    # Trailing /. copies $ROOTFS_DIR's *contents* (including root-level
+    # dotfiles, which the earlier $ROOTFS_DIR/* glob silently skipped -
+    # bash doesn't match dotfiles without dotglob) into $MOUNT_POINT,
+    # rather than $ROOTFS_DIR itself.
+    cp -a "$ROOTFS_DIR"/. $MOUNT_POINT
     umount $MOUNT_POINT
     rm -r $MOUNT_POINT
 } &> $SHELLTRAP
