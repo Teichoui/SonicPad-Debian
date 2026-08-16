@@ -45,9 +45,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          run_id=$(gh run list --repo "${{ github.repository }}" --workflow=build.yml --limit 50 \
-            --json databaseId,headSha,status,conclusion \
-            --jq '[.[] | select(.headSha == "${{ github.sha }}" and .status == "completed" and .conclusion == "success")][0].databaseId // empty')
+          run_id=$(gh run list --repo "${{ github.repository }}" --workflow=build.yml \
+            --commit "${{ github.sha }}" --status success -L 1 \
+            --json databaseId --jq '.[0].databaseId // empty')
           if [ -z "$run_id" ]; then
             echo "No successful build.yml run found for ${{ github.sha }} - building from scratch."
             echo "found=false" >> "$GITHUB_OUTPUT"
