@@ -45,9 +45,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # `|| true` keeps a transient gh/API failure here from aborting
+          # the whole step under this shell's default -e - a failed
+          # lookup should fall back to a full build below (run_id stays
+          # empty either way), not fail the entire release.
           run_id=$(gh run list --repo "${{ github.repository }}" --workflow=build.yml \
             --commit "${{ github.sha }}" --status success -L 1 \
-            --json databaseId --jq '.[0].databaseId // empty')
+            --json databaseId --jq '.[0].databaseId // empty') || true
           if [ -z "$run_id" ]; then
             echo "No successful build.yml run found for ${{ github.sha }} - building from scratch."
             echo "found=false" >> "$GITHUB_OUTPUT"
