@@ -31,8 +31,85 @@ jobs:
       # file for the full history/reasoning behind each one. Kept as a
       # separate copy rather than a shared/reusable workflow so this
       # never risks touching the already-verified build.yml.
+      #
+      # The build steps themselves are skipped (via each step's `if:`)
+      # when build.yml already built this exact commit successfully -
+      # see "Try to reuse build.yml's artifact" below. This is common:
+      # a release is often dispatched right after merging to main, and
+      # build.yml already ran (and uploaded the built image) on that
+      # same push. Redoing an identical ~30 minute build right after is
+      # pure waste.
+
+      - name: Try to reuse build.yml's artifact for this commit
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Look up ANY build.yml run for this commit (not just completed
+          # ones): the primary scenario this whole step exists for is a
+          # release dispatched right after merging to main, where
+          # build.yml's own push-triggered run (~30 minutes) is often
+          # still queued/in progress. Racing ahead with an independent
+          # rebuild in that case defeats the point - poll for it to
+          # finish instead, bounded so a stuck/failed build.yml run can't
+          # hang this step forever. `|| true` on each lookup keeps a
+          # transient gh/API failure from aborting the whole step under
+          # this shell's default -e; a failed lookup just falls back to
+          # a full build below like any other "nothing to reuse" case.
+          lookup() {
+            gh run list --repo "${{ github.repository }}" --workflow=build.yml \
+              --commit "${{ github.sha }}" -L 1 \
+              --json databaseId,status,conclusion --jq '.[0] // empty' || true
+          }
+
+          info=$(lookup)
+          if [ -z "$info" ]; then
+            echo "No build.yml run found for ${{ github.sha }} - building from scratch."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          run_id=$(echo "$info" | jq -r '.databaseId')
+          status=$(echo "$info" | jq -r '.status')
+
+          elapsed=0
+          max_wait=2400  # 40 minutes - comfortably above build.yml's typical ~30-35 minute run
+          while [ "$status" != "completed" ] && [ "$elapsed" -lt "$max_wait" ]; do
+            echo "build.yml run $run_id for this commit is still '$status' - waiting (${elapsed}s elapsed)..."
+            sleep 30
+            elapsed=$((elapsed + 30))
+            info=$(lookup)
+            # A transient failure here leaves $info empty, which isn't
+            # valid JSON for jq to parse - fall back to "unknown" rather
+            # than letting that abort the step; the loop just keeps
+            # polling (or times out) instead of crashing on a blip.
+            status=$(echo "$info" | jq -r '.status // "unknown"' 2>/dev/null) || status="unknown"
+          done
+
+          conclusion=$(echo "$info" | jq -r '.conclusion // empty' 2>/dev/null) || conclusion=""
+          if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then
+            echo "build.yml run $run_id ended up status='$status' conclusion='$conclusion' - not reusable, building from scratch."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Found successful build.yml run $run_id for this commit - trying to reuse its artifact."
+          mkdir -p src/out
+          # build.yml's artifact expires after 3 days (retention-days: 3)
+          # - a `gh run download` past that fails, which is a normal,
+          # expected case here, not an error: fall back to a full build
+          # instead of failing the whole release.
+          if gh run download "$run_id" --repo "${{ github.repository }}" --name debian_r818_sonic_lcd_uart0 --dir src/out; then
+            echo "Reused build.yml's artifact - skipping the full rebuild below."
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Artifact download failed (likely expired past its 3-day retention) - building from scratch."
+            rm -rf src/out
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Free disk space
+        if: steps.reuse.outputs.found != 'true'
         run: |
           echo "Before cleanup:"
           df -h /
@@ -42,12 +119,14 @@ jobs:
           df -h /
 
       - name: Install 32-bit runtime for the bundled dragon packer
+        if: steps.reuse.outputs.found != 'true'
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y libc6:i386 libstdc++6:i386 zlib1g:i386
 
       - name: Add the credentials (C) flag, with an immediate self-test and auto-revert
+        if: steps.reuse.outputs.found != 'true'
         run: |
           sudo bash <<'ROOTSCRIPT'
           set -e
@@ -107,6 +186,7 @@ jobs:
           ROOTSCRIPT
 
       - name: Run full build (create_rootfs + pack_img)
+        if: steps.reuse.outputs.found != 'true'
         working-directory: src
         run: |
           export DEBIAN_FRONTEND=noninteractive
