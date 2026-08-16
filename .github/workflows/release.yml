@@ -31,8 +31,45 @@ jobs:
       # file for the full history/reasoning behind each one. Kept as a
       # separate copy rather than a shared/reusable workflow so this
       # never risks touching the already-verified build.yml.
+      #
+      # The build steps themselves are skipped (via each step's `if:`)
+      # when build.yml already built this exact commit successfully -
+      # see "Try to reuse build.yml's artifact" below. This is common:
+      # a release is often dispatched right after merging to main, and
+      # build.yml already ran (and uploaded the built image) on that
+      # same push. Redoing an identical ~30 minute build right after is
+      # pure waste.
+
+      - name: Try to reuse build.yml's artifact for this commit
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "${{ github.repository }}" --workflow=build.yml --limit 50 \
+            --json databaseId,headSha,status,conclusion \
+            --jq '[.[] | select(.headSha == "${{ github.sha }}" and .status == "completed" and .conclusion == "success")][0].databaseId // empty')
+          if [ -z "$run_id" ]; then
+            echo "No successful build.yml run found for ${{ github.sha }} - building from scratch."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Found build.yml run $run_id for this commit - trying to reuse its artifact."
+          mkdir -p src/out
+          # build.yml's artifact expires after 3 days (retention-days: 3)
+          # - a `gh run download` past that fails, which is a normal,
+          # expected case here, not an error: fall back to a full build
+          # instead of failing the whole release.
+          if gh run download "$run_id" --repo "${{ github.repository }}" --name debian_r818_sonic_lcd_uart0 --dir src/out; then
+            echo "Reused build.yml's artifact - skipping the full rebuild below."
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Artifact download failed (likely expired past its 3-day retention) - building from scratch."
+            rm -rf src/out
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Free disk space
+        if: steps.reuse.outputs.found != 'true'
         run: |
           echo "Before cleanup:"
           df -h /
@@ -42,12 +79,14 @@ jobs:
           df -h /
 
       - name: Install 32-bit runtime for the bundled dragon packer
+        if: steps.reuse.outputs.found != 'true'
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y libc6:i386 libstdc++6:i386 zlib1g:i386
 
       - name: Add the credentials (C) flag, with an immediate self-test and auto-revert
+        if: steps.reuse.outputs.found != 'true'
         run: |
           sudo bash <<'ROOTSCRIPT'
           set -e
@@ -107,6 +146,7 @@ jobs:
           ROOTSCRIPT
 
       - name: Run full build (create_rootfs + pack_img)
+        if: steps.reuse.outputs.found != 'true'
         working-directory: src
         run: |
           export DEBIAN_FRONTEND=noninteractive
