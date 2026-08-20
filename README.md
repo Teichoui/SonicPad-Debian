@@ -242,3 +242,21 @@ Obico's dashboard needs Janus (a WebRTC server) for a real live video feed - wit
 ```
 
 It symlinks the bundled Janus binaries to the variant name the Sonic Pad's board actually resolves to (`NA.debian.12.64-bit`) and installs the binary's missing shared library dependencies (`libconfig9`, `libnice10`, `libsrtp2-1`, `libusrsctp2` - confirmed via `ldd` that these aren't pulled in by anything else this project installs), then prints the command to restart the service (`sudo systemctl restart moonraker-obico`) - it doesn't restart it for you, since moonraker-obico may not even be running yet the first time this is run.
+
+### 6. KIAUH shows Mainsail/Fluidd install as "Incomplete" with an nginx error
+
+If nginx fails during a KIAUH web-interface install, check its status for this specific error:
+
+```bash
+sudo systemctl status nginx
+# socket() [::]:80 failed (97: Address family not supported by protocol)
+```
+
+This is a [known KIAUH bug on Debian Bookworm](https://github.com/dw-0/kiauh/issues/442) - nginx's default config tries to bind an IPv6 socket (`[::]:80`), but this image doesn't have IPv6 enabled, so the bind fails and the install reports as incomplete.
+
+Fix - purge and reinstall nginx, then retry the Mainsail/Fluidd install from KIAUH:
+
+```bash
+sudo apt-get remove --purge nginx nginx-full nginx-common
+sudo apt-get install nginx
+```
