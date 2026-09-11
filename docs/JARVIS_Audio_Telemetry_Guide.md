@@ -1,20 +1,13 @@
-# 🚀 The Master Guide: Real-Time Klipper Audio Telemetry Matrix
-
-## 📋 The Problem
-Most modern web browsers and operating systems have strict security sandboxes. They **block uninvited network scripts, forbid background audio autoplay without manual clicks**, and **terminate insecure background local IP WebSocket connections (`ws://`)**. 
-
-Furthermore, running scripts on computer startup usually fails because the script executes before the PC's Wi-Fi card fully finishes authenticating with the home router network. 
-
-## 🛠️ The Ultimate Solution
-Instead of fighting browser extensions or manual console copy-pasting, the most stable, zero-maintenance approach is to move the vocal engine **completely out of the browser** and run it as a native, loop-protected, hidden **Windows PowerShell daemon** hooked directly into the printer's over-the-air API connection.
-
+🚀 The Master Guide: Real-Time Klipper Audio Telemetry Matrix
+📋 The Problem
+Most modern web browsers and operating systems have strict security sandboxes. They block uninvited network scripts, forbid background audio autoplay without manual clicks, and terminate insecure background local IP WebSocket connections (`ws://`).
+Furthermore, running scripts on computer startup usually fails because the script executes before the PC's Wi-Fi card fully finishes authenticating with the home router network.
+🛠️ The Ultimate Solution
+Instead of fighting browser extensions or manual console copy-pasting, the most stable, zero-maintenance approach is to move the vocal engine completely out of the browser and run it as a native, loop-protected, hidden Windows PowerShell daemon hooked directly into the printer's over-the-air API connection.
 ---
-
-### Step 1: Configure Your Klipper Macro Overrides (`printer.cfg`)
-To broadcast audio triggers over your home router network cleanly, you must instruct Klipper to push uniform logging hooks out of its standard console stream. 
-
+Step 1: Configure Your Klipper Macro Overrides (`printer.cfg`)
+To broadcast audio triggers over your home router network cleanly, you must instruct Klipper to push uniform logging hooks out of its standard console stream.
 Paste this macro block directly into your `printer.cfg`. It automatically intercepts heating, homing, and mesh calibrations to announce milestones with your precise 2-second voice timing pauses without needing to change your slicer settings:
-
 ```text
 # ==========================================
 # 1. SYSTEM INITIALIZATION & BOOT
@@ -86,15 +79,11 @@ gcode:
 gcode:
     RESPOND TYPE=echo MSG="ALERT: Objective complete. System standing down"
 ```
-
 ---
-
-### Step 2: Build the Core PowerShell Matrix (`jarvis_cockpit.ps1`)
-This script opens a native network pipe over your home router, authorizes itself by attaching a valid `Origin` web header to bypass security proxies, uses a text scanner to pull telemetry milestones, and features a **Memory Shield** to ensure each phrase plays exactly once without looping.
-
-1. Open **Notepad** on your PC.
-2. Paste the following script inside:
-
+Step 2: Build the Core PowerShell Matrix (`jarvis_cockpit.ps1`)
+This script opens a native network pipe over your home router, authorizes itself by attaching a valid `Origin` web header to bypass security proxies, uses a text scanner to pull telemetry milestones, and features a Memory Shield to ensure each phrase plays exactly once without looping.
+Open Notepad on your PC.
+Paste the following script inside:
 ```powershell
 Add-Type -AssemblyName System.Speech
 $Voice = New-Object System.Speech.Synthesis.SpeechSynthesizer
@@ -168,16 +157,12 @@ while ($true) {
     Start-Sleep -Seconds 5
 }
 ```
-3. Save this file inside your **`Documents`** folder as exactly **`jarvis_cockpit.ps1`**.
-
+Save this file inside your `Documents` folder as exactly `jarvis_cockpit.ps1`.
 ---
-
-### Step 3: Create the Unrestricted Bypass Launcher (`Launch_JARVIS.bat`)
-Windows strictly blocks execution of custom background `.ps1` code profiles out of safety rules. We bypass this roadblock natively by routing it through an administrative batch wrapper file configured in **`Hidden`** mode so your desktop stays perfectly clean.
-
-1. Open a blank **Notepad** window.
-2. Paste this execution rule code structure inside:
-
+Step 3: Create the Unrestricted Bypass Launcher (`Launch_JARVIS.bat`)
+Windows strictly blocks execution of custom background `.ps1` code profiles out of safety rules. We bypass this roadblock natively by routing it through an administrative batch wrapper file configured in `Hidden` mode so your desktop stays perfectly clean.
+Open a blank Notepad window.
+Paste this execution rule code structure inside:
 ```text
 @echo off
 powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%USERPROFILE%\Documents\jarvis_cockpit.ps1"
@@ -187,18 +172,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%US
 :: powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File "%USERPROFILE%\Documents\jarvis_cockpit.ps1"
 :: pause
 ```
-3. Save this file directly inside your **`Documents`** folder as exactly **`Launch_JARVIS.bat`**.
-
+Save this file directly inside your `Documents` folder as exactly `Launch_JARVIS.bat`.
 ---
-
-### Step 4: Automate to Windows Boot (Task Scheduler)
+Step 4: Automate to Windows Boot (Task Scheduler)
 To ensure the voice engine is fully hands-free without ever clicking manual icons or desktop shortcuts, lock it directly into Windows System Core:
-
-1. Press your Windows Key, search for **Task Scheduler**, and open it.
-2. On the right-side options panel, click **Create Basic Task...**
-3. **Name:** Set to `🚀 JARVIS Launch` and click Next.
-4. **Trigger:** Change to **When I log on**. Click Next.
-5. **Action:** Choose **Start a program** and click Next.
-6. **Program/Script:** Click Browse, navigate to your *Documents* folder, and select your **`Launch_JARVIS.bat`** file. Click Next, then click Finish.
-7. **Lock Admin Rights:** Locate your newly created task in the center list, **right-click** it, and select **Properties**. At the very bottom of the *General* tab, check the box for **"Run with highest privileges"**.
-8. **Network Freedom:** Flip to the **Conditions** tab at the top. Under the *Network* section at the very bottom, **uncheck** the network block rule and change the dropdown back to **Any connection**. Click OK.
+Press your Windows Key, search for Task Scheduler, and open it.
+On the right-side options panel, click Create Basic Task...
+Name: Set to `🚀 JARVIS Launch` and click Next.
+Trigger: Change to When I log on. Click Next.
+Action: Choose Start a program and click Next.
+Program/Script: Click Browse, navigate to your Documents folder, and select your `Launch_JARVIS.bat` file. Click Next, then click Finish.
+Lock Admin Rights: Locate your newly created task in the center list, right-click it, and select Properties. At the very bottom of the General tab, check the box for "Run with highest privileges".
+Network Freedom: Flip to the Conditions tab at the top. Under the Network section at the very bottom, uncheck the network block rule and change the dropdown back to Any connection. Click OK.
