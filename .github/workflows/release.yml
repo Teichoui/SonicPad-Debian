@@ -19,7 +19,10 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04 on ~2026-11-09, where qemu-user-static
+    # is only a virtual package (-> qemu-user-binfmt) and the binfmt setup below
+    # no longer installs. Re-test on a newer image before unpinning.
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
