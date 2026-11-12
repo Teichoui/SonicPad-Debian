@@ -5,8 +5,8 @@
 # Pad to have an identical WiFi MAC - a real conflict on any network with
 # more than one. Runs once on first boot (before the wifi kernel modules
 # load, via systemd-modules-load.service ordering) to replace it with a
-# random, valid, locally-administered unicast MAC unique to this device,
-# then disables itself so it never runs again.
+# random unicast MAC unique to this device, then disables itself so it
+# never runs again.
 
 set -e
 
@@ -14,9 +14,13 @@ MAC_FILE=/etc/wifi/xr_wifi.conf
 TMP_FILE="${MAC_FILE}.new"
 
 read -r b1 b2 b3 b4 b5 b6 < <(od -An -tu1 -N6 /dev/urandom)
-# Locally-administered (bit 1 of the first byte set) + unicast (bit 0
-# clear), so it can never collide with a real vendor-assigned MAC.
-b1=$(( (b1 & 0xFE) | 0x02 ))
+# The xradio driver (xr819_core.ko) only keeps a MAC from this file if the
+# first byte has both low bits clear: unicast (bit 0) and universally
+# administered (bit 1). It throws away anything else - including the
+# locally-administered MACs this script used to generate - and writes a
+# random MAC of its own to this file on first load. Clear both bits so the
+# MAC generated here is the one the driver actually uses.
+b1=$(( b1 & 0xFC ))
 mac=$(printf '%02X:%02X:%02X:%02X:%02X:%02X' "$b1" "$b2" "$b3" "$b4" "$b5" "$b6")
 
 if ! [[ "$mac" =~ ^([0-9A-F]{2}:){5}[0-9A-F]{2}$ ]]; then
